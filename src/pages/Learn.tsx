@@ -32,29 +32,29 @@ export default function Learn() {
           {t('learn.back', language)}
         </Link>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="flex items-center gap-2 mb-2">
-            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-              lesson.level === 'beginner' ? 'bg-green-500/20 text-green-400' :
-              lesson.level === 'intermediate' ? 'bg-yellow-500/20 text-yellow-400' :
-              'bg-red-500/20 text-red-400'
+          <div className="flex items-center gap-2 mb-4">
+            <span className={`px-3 py-1 text-xs font-medium rounded-full border ${
+              lesson.level === 'beginner' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
+              lesson.level === 'intermediate' ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400' :
+              'bg-red-500/10 border-red-500/20 text-red-400'
             }`}>
               {t(`learn.${lesson.level}`, language)}
             </span>
             {lesson.pinned && <Pin size={14} className="text-orange-400" />}
             {isCompleted && (
-              <span className="flex items-center gap-1 text-xs text-green-400">
+              <span className="flex items-center gap-1 text-xs text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
                 <Check size={14} />
                 {t('learn.completed', language)}
               </span>
             )}
           </div>
-          <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 sm:p-8">
+          <div className="bg-slate-900/40 backdrop-blur-xl border border-white/[0.08] rounded-2xl p-6 sm:p-8 shadow-2xl shadow-black/20">
             <MarkdownRenderer content={content} />
           </div>
           {currentUser && !isCompleted && (
             <button
               onClick={handleComplete}
-              className="mt-4 px-6 py-2 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-all"
+              className="mt-6 px-8 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-medium rounded-xl transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 animate-pulse-glow"
             >
               {t('learn.mark_complete', language)}
             </button>
@@ -79,19 +79,19 @@ export default function Learn() {
 
       {/* Pinned */}
       {pinnedLessons.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-sm font-medium text-orange-400 mb-3 flex items-center gap-1">
-            <Pin size={14} /> {language === 'vi' ? 'B\u00e0i h\u1ecdc \u0111\u01b0\u1ee3c ghim' : 'Pinned Lessons'}
+        <div className="mb-8">
+          <h3 className="text-sm font-medium text-orange-400 mb-4 flex items-center gap-2">
+            <Pin size={16} /> {language === 'vi' ? 'B\u00e0i h\u1ecdc \u0111\u01b0\u1ee3c ghim' : 'Pinned Lessons'}
           </h3>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid sm:grid-cols-2 gap-4">
             {pinnedLessons.map(l => (
               <Link
                 key={l.id}
                 to={`/learn/${l.id}`}
-                className="p-4 rounded-xl bg-orange-500/5 border border-orange-500/20 hover:border-orange-500/40 transition-all"
+                className="p-5 rounded-2xl bg-orange-500/5 border border-orange-500/20 hover:border-orange-500/40 hover:bg-orange-500/10 transition-all group"
               >
-                <p className="text-sm text-orange-400 capitalize mb-1">{l.level}</p>
-                <p className="text-white font-medium">{language === 'vi' ? l.title_vi : l.title_en}</p>
+                <p className="text-xs font-medium text-orange-400/80 uppercase tracking-wider mb-1">{l.level}</p>
+                <p className="text-white font-semibold group-hover:text-orange-100 transition-colors">{language === 'vi' ? l.title_vi : l.title_en}</p>
               </Link>
             ))}
           </div>
@@ -99,21 +99,21 @@ export default function Learn() {
       )}
 
       {/* Level Tabs */}
-      <div className="flex gap-2 mb-6">
-        {levels.map(level => (
-          <button
-            key={level}
-            onClick={() => setActiveLevel(level)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeLevel === level
-                ? 'bg-orange-500 text-white'
-                : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700/50'
-            }`}
-          >
-            {t(`learn.${level}`, language)}
-          </button>
-        ))}
-      </div>
+        <div className="flex gap-2 mb-8 p-1 bg-slate-900/40 border border-white/[0.08] rounded-xl w-fit">
+          {levels.map(level => (
+            <button
+              key={level}
+              onClick={() => setActiveLevel(level)}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeLevel === level
+                  ? 'bg-white/10 text-white shadow-lg shadow-black/20'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {t(`learn.${level}`, language)}
+            </button>
+          ))}
+        </div>
 
       {/* Lessons Grid */}
       <div className="space-y-3">
@@ -128,21 +128,21 @@ export default function Learn() {
             >
               <Link
                 to={`/learn/${lesson.id}`}
-                className="flex items-center gap-4 p-4 rounded-xl bg-slate-800/30 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/50 transition-all group"
+                className="flex items-center gap-4 p-4 rounded-xl bg-slate-900/40 border border-white/[0.08] hover:border-white/[0.15] hover:bg-white/5 transition-all interactive-row"
               >
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 border ${
                   isCompleted
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-slate-700/50 text-slate-400'
+                    ? 'bg-green-500/10 border-green-500/20 text-green-400'
+                    : 'bg-white/5 border-white/[0.08] text-slate-400'
                 }`}>
-                  {isCompleted ? <Check size={16} /> : lesson.order}
+                  {isCompleted ? <Check size={18} /> : lesson.order}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-white font-medium group-hover:text-orange-400 transition-colors truncate">
                     {language === 'vi' ? lesson.title_vi : lesson.title_en}
                   </p>
                 </div>
-                {lesson.pinned && <Pin size={14} className="text-orange-400 shrink-0" />}
+                {lesson.pinned && <Pin size={16} className="text-orange-400 shrink-0" />}
               </Link>
             </motion.div>
           );

@@ -148,9 +148,11 @@ export default function Training() {
 
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex items-center gap-3 mb-8">
-          <CoachCrab size={40} animate={false} />
-          <h1 className="text-2xl font-bold text-white">{t('training.title', language)}</h1>
+        <div className="flex items-center gap-4 mb-8">
+          <div className="p-3 rounded-2xl bg-slate-900/50 border border-white/[0.06] shadow-xl">
+            <CoachCrab size={32} animate={false} />
+          </div>
+          <h1 className="text-3xl font-bold text-white tracking-tight">{t('training.title', language)}</h1>
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           {modes.map((m, i) => (
@@ -160,9 +162,9 @@ export default function Training() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
               onClick={() => { setMode(m.key); reset(); }}
-              className="text-left p-6 rounded-2xl border border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/60 transition-all hover:border-slate-600 group"
+              className="text-left p-6 rounded-2xl border border-white/[0.06] bg-slate-900/50 hover:bg-slate-900/80 transition-all hover:border-white/[0.1] group glass-card"
             >
-              <div className={`inline-flex p-2 rounded-lg bg-gradient-to-r ${m.color} mb-3`}>
+              <div className={`inline-flex p-3 rounded-xl bg-gradient-to-r ${m.color} mb-4 shadow-lg shadow-black/20`}>
                 <ArrowRight size={20} className="text-white" />
               </div>
               <h3 className="text-lg font-semibold text-white mb-1 group-hover:text-orange-400 transition-colors">{m.title}</h3>

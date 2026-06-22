@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -26,6 +27,65 @@
 * {
   scrollbar-width: thin;
   scrollbar-color: #334155 transparent;
+}
+
+/* Stylized thin scrollbars */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Premium Cyber-Dark Form Inputs & Controls */
+.cyber-input {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 0.5rem !important; /* rounded-lg */
+  color: #f8fafc !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.cyber-input:focus {
+  outline: none !important;
+  border-color: rgba(249, 115, 22, 0.4) !important;
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.15) !important;
+}
+
+/* Special Info Blocks */
+.info-block {
+  border-left: 4px solid #f97316 !important;
+  background-color: rgba(249, 115, 22, 0.05) !important;
+  backdrop-filter: blur(4px);
+  border-top-right-radius: 1rem !important;
+  border-bottom-right-radius: 1rem !important;
+  padding: 1.5rem !important;
+}
+
+/* Interactive list rows hover feedback */
+.interactive-row {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.interactive-row:hover {
+  background-color: rgba(30, 41, 59, 0.6) !important;
+  transform: translateX(4px);
 }
 
 body {

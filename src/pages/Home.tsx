@@ -22,14 +22,14 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen max-w-7xl mx-auto px-6 pt-16">
       {/* Hero Section */}
-      <section className="relative overflow-hidden py-20 sm:py-32">
+      <section className="relative overflow-hidden py-20 sm:py-28">
         <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-cyan-500/5" />
-        <div className="absolute top-20 left-10 w-72 h-72 bg-orange-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-20 left-10 w-72 h-72 bg-orange-500/20 rounded-full blur-[128px]" />
+        <div className="absolute bottom-20 right-10 w-72 h-72 bg-cyan-500/20 rounded-full blur-[128px]" />
 
-        <div className="relative max-w-5xl mx-auto px-4 text-center">
+        <div className="relative max-w-5xl mx-auto px-6 text-center">
           <motion.div {...fadeIn} className="mb-8 flex justify-center">
             <CoachCrab size={120} />
           </motion.div>
@@ -60,13 +60,13 @@ export default function Home() {
           >
             <Link
               to="/learn"
-              className="px-8 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-xl shadow-lg shadow-orange-500/25 transition-all hover:scale-105"
+              className="px-8 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-medium rounded-xl shadow-lg shadow-orange-500/20 transition-all hover:scale-105 active:scale-95 animate-pulse-glow"
             >
               {t('home.hero.cta', language)}
             </Link>
             <Link
               to="/battle"
-              className="px-8 py-3 border border-slate-600 hover:border-orange-500 text-slate-300 hover:text-orange-400 font-semibold rounded-xl transition-all hover:scale-105"
+              className="px-8 py-3 border border-white/[0.08] hover:border-orange-500 bg-white/5 text-slate-300 hover:text-orange-400 font-medium rounded-xl transition-all hover:scale-105 active:scale-95"
             >
               {t('home.hero.cta2', language)}
             </Link>
@@ -76,12 +76,12 @@ export default function Home() {
 
       {/* Announcements */}
       {announcements.length > 0 && (
-        <section className="max-w-5xl mx-auto px-4 mb-12">
-          <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
+        <section className="max-w-5xl mx-auto px-6 mb-12">
+          <div className="info-block">
             {announcements.map(a => (
               <div key={a.id} className="mb-2 last:mb-0">
-                <h3 className="font-semibold text-orange-400">{language === 'vi' ? a.title_vi : a.title_en}</h3>
-                <p className="text-sm text-slate-400">{language === 'vi' ? a.content_vi : a.content_en}</p>
+                <h3 className="font-bold text-orange-400">{language === 'vi' ? a.title_vi : a.title_en}</h3>
+                <p className="text-sm text-slate-300 font-medium">{language === 'vi' ? a.content_vi : a.content_en}</p>
               </div>
             ))}
           </div>
@@ -89,7 +89,7 @@ export default function Home() {
       )}
 
       {/* Features */}
-      <section className="max-w-5xl mx-auto px-4 pb-20">
+      <section className="max-w-5xl mx-auto px-6 pb-20">
         <div className="grid sm:grid-cols-2 gap-6">
           {features.map((f, i) => (
             <motion.div
@@ -98,17 +98,17 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 + i * 0.1, duration: 0.5 }}
             >
-              <Link
-                to={f.to}
-                className="group block p-6 rounded-2xl border border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/60 transition-all hover:border-slate-600 hover:shadow-xl"
-              >
+                <Link
+                  to={f.to}
+                  className="group block p-6 bg-slate-900/40 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/20 hover:border-white/[0.15] hover:bg-white/5 hover:translate-y-[-4px] transition-all duration-300"
+                >
                 <div className={`inline-flex p-3 rounded-xl bg-gradient-to-r ${f.color} mb-4`}>
                   <f.icon size={24} className="text-white" />
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-orange-400 transition-colors">
+                <h3 className="text-lg font-bold text-white mb-2 group-hover:text-orange-400 transition-colors">
                   {f.title}
                 </h3>
-                <p className="text-slate-400 text-sm leading-relaxed">{f.desc}</p>
+                <p className="text-slate-400 text-sm font-medium leading-relaxed">{f.desc}</p>
               </Link>
             </motion.div>
           ))}
@@ -116,18 +116,18 @@ export default function Home() {
       </section>
 
       {/* Quick Tips */}
-      <section className="max-w-5xl mx-auto px-4 pb-20">
-        <div className="flex items-start gap-4 p-6 rounded-2xl bg-slate-800/30 border border-slate-700/50">
+      <section className="max-w-5xl mx-auto px-6 pb-20">
+        <div className="flex items-start gap-4 p-6 bg-slate-900/40 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/20">
           <div className="shrink-0">
             <CoachCrab size={50} animate={false} />
           </div>
           <div>
             <h3 className="font-semibold text-orange-400 mb-1">
-              {language === 'vi' ? 'M\u1eb9o t\u1eeb Coach Crab' : 'Quick Tip from Coach Crab'}
+              {language === 'vi' ? 'Mẹo từ Coach Crab' : 'Quick Tip from Coach Crab'}
             </h3>
-            <p className="text-slate-400 text-sm leading-relaxed">
+            <p className="text-slate-400 text-sm font-medium leading-relaxed">
               {language === 'vi'
-                ? 'H\u00e3y b\u1eaft \u0111\u1ea7u v\u1edbi c\u00e1c b\u00e0i h\u1ecdc c\u01a1 b\u1ea3n, sau \u0111\u00f3 luy\u1ec7n t\u1eadp v\u1edbi c\u00e1c bot AI \u1edf c\u00e1c m\u1ee9c \u0111\u1ed9 kh\u00e1c nhau. \u0110\u1eebng qu\u00ean d\u00f9ng ch\u1ee9c n\u0103ng chu\u1ea9n b\u1ecb tr\u01b0\u1edbc m\u1ed7i tr\u1eadn \u0111\u1ea5u!'
+                ? 'Hãy bắt đầu với các bài học cơ bản, sau đó luyện tập với các bot AI ở các mức độ khác nhau. Đừng quên dùng chức năng chuẩn bị trước mỗi trận đấu!'
                 : 'Start with the beginner lessons, then practice with AI bots at different levels. Don\'t forget to use the Prepare feature before each battle!'}
             </p>
           </div>

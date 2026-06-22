@@ -36,44 +36,46 @@ export default function Prep() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <div className="flex items-center gap-3 mb-6">
-        <CoachCrab size={40} animate={false} />
-        <h1 className="text-2xl font-bold text-white">{t('prep.title', language)}</h1>
+      <div className="flex items-center gap-4 mb-8">
+        <div className="p-3 rounded-2xl bg-slate-900/50 border border-white/[0.06] shadow-xl">
+          <CoachCrab size={32} animate={false} />
+        </div>
+        <h1 className="text-3xl font-bold text-white tracking-tight">{t('prep.title', language)}</h1>
       </div>
 
       {!aiConfigured && (
-        <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-400 text-sm">
+        <div className="mb-8 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-400 text-sm backdrop-blur-sm">
           {language === 'vi' ? 'AI chỉ được quản lý bởi admin. Liên hệ admin để cấu hình.' : 'AI access is controlled by admin. Please ask an admin to configure AI for the system.'}
         </div>
       )}
 
-      <div className="space-y-4 mb-6">
+      <div className="glass-card p-6 space-y-6 mb-8">
         <div>
-          <label className="block text-sm font-medium text-slate-400 mb-2">{t('prep.topic', language)}</label>
+          <label className="block text-sm font-medium text-slate-400 mb-3">{t('prep.topic', language)}</label>
           <input
             type="text"
             value={topic}
             onChange={e => setTopic(e.target.value)}
-            className="w-full px-4 py-2.5 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-            placeholder={language === 'vi' ? 'Nh\u1eadp \u0111\u1ec1 b\u00e0i tranh bi\u1ec7n...' : 'Enter debate motion...'}
+            className="w-full px-4 py-3 bg-slate-950/50 border border-white/[0.06] rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50 cyber-input"
+            placeholder={language === 'vi' ? 'Nhập đề bài tranh biện...' : 'Enter debate motion...'}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-400 mb-2">{t('prep.position', language)}</label>
-          <div className="flex gap-2">
+          <label className="block text-sm font-medium text-slate-400 mb-3">{t('prep.position', language)}</label>
+          <div className="flex gap-2 p-1 bg-slate-950/50 border border-white/[0.06] rounded-xl">
             <button
               onClick={() => setPosition('for')}
-              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                position === 'for' ? 'bg-green-500 text-white' : 'bg-slate-800/50 text-slate-400'
+              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                position === 'for' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
               {t('battle.for', language)}
             </button>
             <button
               onClick={() => setPosition('against')}
-              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                position === 'against' ? 'bg-red-500 text-white' : 'bg-slate-800/50 text-slate-400'
+              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                position === 'against' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
               {t('battle.against', language)}
@@ -84,10 +86,10 @@ export default function Prep() {
         <button
           onClick={generate}
           disabled={!topic.trim() || isLoading || !aiConfigured}
-          className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-xl transition-all disabled:opacity-50"
+          className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-2xl transition-all hover:scale-[1.01] shadow-lg shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed animate-pulse-glow"
         >
           {isLoading
-            ? (language === 'vi' ? '\u0110ang t\u1ea1o...' : 'Generating...')
+            ? (language === 'vi' ? 'Đang tạo...' : 'Generating...')
             : t('prep.generate', language)}
         </button>
       </div>
@@ -100,14 +102,14 @@ export default function Prep() {
 
       {result && !isLoading && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
+          <div className="bg-slate-900/50 backdrop-blur-md border border-white/[0.06] rounded-2xl p-6 shadow-xl shadow-slate-950/20">
             <MarkdownRenderer content={result} />
           </div>
           <button
             onClick={saveAsNote}
-            className="mt-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-all"
+            className="mt-6 px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-xl transition-all border border-white/[0.06]"
           >
-            {language === 'vi' ? 'L\u01b0u v\u00e0o ghi ch\u00fa' : 'Save to Notes'}
+            {language === 'vi' ? 'Lưu vào ghi chú' : 'Save to Notes'}
           </button>
         </motion.div>
       )}
