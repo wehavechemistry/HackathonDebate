@@ -24,12 +24,14 @@ export default function Dashboard() {
     <div className="max-w-5xl mx-auto px-4 py-8">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
         <div className="flex items-center gap-4">
-          <CoachCrab size={50} animate={false} />
+          <div className="p-3 rounded-2xl bg-slate-900/50 border border-white/[0.06] shadow-xl">
+            <CoachCrab size={40} animate={false} />
+          </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">
+            <h1 className="text-3xl font-bold text-white tracking-tight">
               {t('dashboard.welcome', language)}, <span className="text-orange-400">{currentUser.username}</span>
             </h1>
-            <p className="text-slate-400 text-sm">
+            <p className="text-slate-400">
               {language === 'vi' ? 'S\u1eb5n s\u00e0ng luy\u1ec7n debate h\u00f4m nay?' : 'Ready to practice debate today?'}
             </p>
           </div>
@@ -42,9 +44,9 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-5"
+          className="glass-card p-6"
         >
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-6">
             <h2 className="font-semibold text-white flex items-center gap-2">
               <Clock size={18} className="text-orange-400" />
               {t('dashboard.recent', language)}
@@ -63,8 +65,8 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-3">
               {currentUser.recentActivity.map(act => (
-                <div key={act.id} className="flex items-start gap-3 p-3 rounded-lg bg-slate-900/30">
-                  <div className="w-2 h-2 mt-2 rounded-full bg-orange-400 shrink-0" />
+                <div key={act.id} className="flex items-start gap-3 p-3 rounded-xl bg-slate-950/50 border border-white/[0.03]">
+                  <div className="w-2 h-2 mt-2 rounded-full bg-orange-500 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm text-white truncate">{act.title}</p>
                     <p className="text-xs text-slate-500">
@@ -83,9 +85,9 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-5"
+          className="glass-card p-6"
         >
-          <h2 className="font-semibold text-white flex items-center gap-2 mb-4">
+          <h2 className="font-semibold text-white flex items-center gap-2 mb-6">
             <FileText size={18} className="text-orange-400" />
             {t('dashboard.notes', language)}
           </h2>
@@ -94,7 +96,7 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {currentUser.savedNotes.map(note => (
-                <div key={note.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-900/30 group">
+                <div key={note.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-950/50 border border-white/[0.03] group">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-white truncate">{note.title}</p>
                     <p className="text-xs text-slate-500 truncate">{note.content.slice(0, 60)}</p>
@@ -117,12 +119,12 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-5"
+            className="glass-card p-6"
           >
-            <h2 className="font-semibold text-white mb-4">{t('dashboard.continue', language)}</h2>
+            <h2 className="font-semibold text-white mb-6">{t('dashboard.continue', language)}</h2>
             <Link
               to={`/learn/${nextLesson.id}`}
-              className="block p-4 rounded-xl bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/20 hover:border-orange-500/40 transition-all"
+              className="block p-4 rounded-2xl bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/20 hover:border-orange-500/40 transition-all"
             >
               <p className="text-sm text-orange-400 font-medium capitalize mb-1">{nextLesson.level}</p>
               <p className="text-white font-medium">{language === 'vi' ? nextLesson.title_vi : nextLesson.title_en}</p>
@@ -135,15 +137,15 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-5"
+          className="glass-card p-6"
         >
-          <h2 className="font-semibold text-white mb-4">{t('dashboard.quick', language)}</h2>
+          <h2 className="font-semibold text-white mb-6">{t('dashboard.quick', language)}</h2>
           <div className="grid grid-cols-2 gap-3">
             {quickLinks.map(link => (
               <Link
                 key={link.to}
                 to={link.to}
-                className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/30 hover:bg-slate-800/50 transition-all group"
+                className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/50 border border-white/[0.03] hover:bg-slate-900/50 transition-all group"
               >
                 <div className={`p-2 rounded-lg ${link.color}`}>
                   <link.icon size={18} />
