@@ -96,7 +96,8 @@ async function initializeDatabase() {
       recentActivity TEXT NOT NULL DEFAULT '[]',
       botStars TEXT NOT NULL DEFAULT '{}',
       trainingStats TEXT NOT NULL DEFAULT '{"rebuttals":0,"speeches":0,"pois":0,"keywordBattles":0,"debates":0}',
-      banned INTEGER NOT NULL DEFAULT 0
+      banned INTEGER NOT NULL DEFAULT 0,
+      unlockedLessonIds TEXT NOT NULL DEFAULT '[]'
     )
   `);
 
@@ -469,7 +470,8 @@ function mapUserRow(row) {
     recentActivity: JSON.parse(row.recentActivity || '[]'),
     botStars: JSON.parse(row.botStars || '{}'),
     trainingStats: JSON.parse(row.trainingStats || '{"rebuttals":0,"speeches":0,"pois":0,"keywordBattles":0,"debates":0}'),
-    banned: !!row.banned
+    banned: !!row.banned,
+    unlockedLessonIds: JSON.parse(row.unlockedLessonIds || '[]')
   };
 }
 
