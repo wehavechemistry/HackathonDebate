@@ -41,8 +41,6 @@ interface AppState {
   updateBot: (id: string, updates: Partial<BotPersonality>) => Promise<void>;
   deleteBot: (id: string) => Promise<void>;
   
-  saveAiConfig: (apiKey: string, model: string) => Promise<boolean>;
-  
   banUser: (userId: string) => Promise<void>;
   unbanUser: (userId: string) => Promise<void>;
   createAdminAccount: (email: string, password: string, username: string) => Promise<{ success: boolean; error?: string }>;
@@ -58,6 +56,8 @@ interface AppState {
   setBotStars: (botId: string, stars: number) => Promise<void>;
   incrementTrainingStat: (stat: 'rebuttals' | 'speeches' | 'pois' | 'keywordBattles' | 'debates') => Promise<void>;
   fetchUsers: () => Promise<void>;
+  isLessonUnlocked: (lessonId: string) => boolean;
+  getNextLesson: (lessonId: string) => Lesson | null;
 }
 
 const STORAGE_KEY = 'debatecrab_config';
@@ -524,5 +524,42 @@ export const useStore = create<AppState>((set, get) => ({
       },
     };
     await state.updateCurrentUser(updated);
+  },
+
+  // Lesson progression
+  isLessonUnlocked: (lessonId: string) => {
+    const state = get();
+    if (!state.currentUser) return false;
+    const lesson = state.lessons.find(l => l.id === lessonId);
+    if (!lesson) return false;
+    
+    // First lesson of each level is always unlocked
+    const firstLessonOfLevel = state.lessons
+      .filter(l => l.level === lesson.level)
+      .sort((a, b) => a.order - b.order)[0];
+    if (firstLessonOfLevel?.id === lessonId) return true;
+    
+    // Check if user has completed the previous lesson in the same level
+    const prevLesson = state.lessons
+      .filter(l => l.level === lesson.level && l.order < lesson.order)
+      .sort((a, b) => b.order - a.order)[0];
+    if (prevLesson && state.currentUser.completedLessons.includes(prevLesson.id)) return true;
+    
+    // Check if explicitly unlocked
+    if (state.currentUser.unlockedLessonIds?.includes(lessonId)) return true;
+    
+    return false;
+  },
+
+  getNextLesson: (lessonId: string) => {
+    const state = get();
+    const lesson = state.lessons.find(l => l.id === lessonId);
+    if (!lesson) return null;
+    
+    const nextLesson = state.lessons
+      .filter(l => l.level === lesson.level && l.order > lesson.order)
+      .sort((a, b) => a.order - b.order)[0];
+    
+    return nextLesson || null;
   },
 }));

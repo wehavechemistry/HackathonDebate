@@ -17,6 +17,7 @@ export interface User {
     debates: number;
   };
   banned: boolean;
+  unlockedLessonIds?: string[];
 }
 
 export interface Note {
