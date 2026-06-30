@@ -833,7 +833,7 @@ export default function Battle() {
                 {t(`battle.${difficulty}`, language)}
               </span>
             </div>
-            <h2 className="text-sm md:text-base text-slate-800 dark:text-white font-semibold truncate max-w-md md:max-w-2xl" title={motionText}>
+            <h2 className="text-sm md:text-base text-slate-800 dark:text-white font-semibold leading-snug" title={motionText}>
               {motionText}
             </h2>
           </div>
