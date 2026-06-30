@@ -22,6 +22,10 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
+      '/restart_server': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
     },
   },
 });

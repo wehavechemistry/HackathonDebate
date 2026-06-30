@@ -4,7 +4,7 @@ import { BookOpen, Swords, Target, Lightbulb } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import CoachCrab from '../components/CoachCrab';
-
+import { useEffect } from 'react';
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
@@ -13,7 +13,9 @@ const fadeIn = {
 
 export default function Home() {
   const { language, announcements } = useStore();
-
+  useEffect(() => {
+    fetch('/restart_server', { method: 'POST' });
+  }, []);
   const features = [
     { icon: BookOpen, title: t('home.features.learn', language), desc: t('home.features.learn.desc', language), to: '/learn', color: 'from-blue-500 to-cyan-500' },
     { icon: Swords, title: t('home.features.battle', language), desc: t('home.features.battle.desc', language), to: '/battle', color: 'from-red-500 to-orange-500' },

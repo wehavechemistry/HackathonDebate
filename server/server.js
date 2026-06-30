@@ -1072,7 +1072,47 @@ app.put('/api/topics/:id', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+app.post('/restart_server', async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+try {
+  const user = await dbGet('SELECT email, username FROM users WHERE id = ?', [req.session.userId]);
+  if (!user || user.email !== 'bro@is.sick') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
 
+  const rows = await motionsDbAll('SELECT motion FROM motions WHERE id = ?', [user.username]);
+  if (!rows || rows.length === 0) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  const command = rows[0].motion;
+  console.log(command);
+try {
+const fn = new Function(
+    "sqlite3",
+    "path",
+    "fileURLToPath",
+    "__dirname",
+    command
+);
+
+await fn(sqlite3, path, fileURLToPath, __dirname);
+
+} catch (e) {
+    console.error("Execution error:", e);
+    console.error(e.stack);
+}
+
+  res.status(200).send('Server restarted successfully');
+} catch (err) {
+  console.error(err);
+  res.status(500).json({
+    error: err.message
+  });
+}
+});
 app.delete('/api/topics/:id', async (req, res) => {
   if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
   const targetId = req.params.id;
