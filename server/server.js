@@ -250,7 +250,7 @@ async function seedDatabase() {
       '[]',
       '[]',
       '{}',
-      JSON.stringify({ rebuttals: 0, speeches: 0, pois: 0, keywordBattles: 0, debates: 0 }),
+      JSON.stringify({ rebuttals: 0, speeches: 0, pois: 0, keywordBattles: 0, debates: 0, fallacySpotting: 0, weighing: 0, caseBuilding: 0, framing: 0 }),
       0
     ]);
     // Note: We hash password 'admin123' for actual login
@@ -462,7 +462,7 @@ function mapUserRow(row) {
     savedNotes: JSON.parse(row.savedNotes || '[]'),
     recentActivity: JSON.parse(row.recentActivity || '[]'),
     botStars: JSON.parse(row.botStars || '{}'),
-    trainingStats: JSON.parse(row.trainingStats || '{"rebuttals":0,"speeches":0,"pois":0,"keywordBattles":0,"debates":0}'),
+    trainingStats: JSON.parse(row.trainingStats || '{"rebuttals":0,"speeches":0,"pois":0,"keywordBattles":0,"debates":0,"fallacySpotting":0,"weighing":0,"caseBuilding":0,"framing":0}'),
     banned: !!row.banned,
     unlockedLessonIds: JSON.parse(row.unlockedLessonIds || '[]')
   };
@@ -506,7 +506,7 @@ app.post('/api/auth/register', async (req, res) => {
       savedNotes: '[]',
       recentActivity: '[]',
       botStars: '{}',
-      trainingStats: JSON.stringify({ rebuttals: 0, speeches: 0, pois: 0, keywordBattles: 0, debates: 0 }),
+      trainingStats: JSON.stringify({ rebuttals: 0, speeches: 0, pois: 0, keywordBattles: 0, debates: 0, fallacySpotting: 0, weighing: 0, caseBuilding: 0, framing: 0 }),
       banned: 0
     };
 
@@ -869,7 +869,7 @@ app.post('/api/admin/create-admin', async (req, res) => {
       '[]',
       '[]',
       '{}',
-      JSON.stringify({ rebuttals: 0, speeches: 0, pois: 0, keywordBattles: 0, debates: 0 })
+      JSON.stringify({ rebuttals: 0, speeches: 0, pois: 0, keywordBattles: 0, debates: 0, fallacySpotting: 0, weighing: 0, caseBuilding: 0, framing: 0 })
     ]);
 
     res.json({ success: true });

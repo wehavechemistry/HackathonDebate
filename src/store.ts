@@ -58,7 +58,7 @@ interface AppState {
   addNote: (title: string, content: string) => Promise<void>;
   deleteNote: (noteId: string) => Promise<void>;
   setBotStars: (botId: string, stars: number) => Promise<void>;
-  incrementTrainingStat: (stat: 'rebuttals' | 'speeches' | 'pois' | 'keywordBattles' | 'debates') => Promise<void>;
+  incrementTrainingStat: (stat: 'rebuttals' | 'speeches' | 'pois' | 'keywordBattles' | 'debates' | 'fallacySpotting' | 'weighing' | 'caseBuilding' | 'framing') => Promise<void>;
   fetchUsers: () => Promise<void>;
   isLessonUnlocked: (lessonId: string) => boolean;
   getNextLesson: (lessonId: string) => Lesson | null;
@@ -568,11 +568,12 @@ export const useStore = create<AppState>((set, get) => ({
   incrementTrainingStat: async (stat) => {
     const state = get();
     if (!state.currentUser) return;
+    const current = state.currentUser.trainingStats[stat] || 0;
     const updated = {
       ...state.currentUser,
       trainingStats: {
         ...state.currentUser.trainingStats,
-        [stat]: state.currentUser.trainingStats[stat] + 1,
+        [stat]: current + 1,
       },
     };
     await state.updateCurrentUser(updated);

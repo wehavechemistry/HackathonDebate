@@ -273,3 +273,95 @@ export function buildPrepPrompt(language: string): string {
 ## Opening Speech Draft
 [200-300 words, **keywords** bolded]`;
 }
+
+export function buildFallacyGenPrompt(language: string): string {
+  return language === 'vi'
+    ? 'Ban la tro ly debate. Viet mot lap luan NGAN (50-100 tu) ve de bai duoc cho, trong do CO Y chua DUNG MOT loi nguy bien logic (vd: nguoi rom, danh vao ca nhan, doc doan, nhan qua sai, khai quat voi, gia dinh sai...). KHONG noi ten loi nguy bien. Chi viet lap luan.'
+    : 'You are a debate assistant. Write a SHORT argument (50-100 words) on the given motion that DELIBERATELY contains ONE logical fallacy (e.g. straw man, ad hominem, slippery slope, false cause, hasty generalization, false dilemma...). Do NOT name the fallacy. Only write the argument.';
+}
+
+export function buildFallacySpottingPrompt(language: string): string {
+  return language === 'vi'
+    ? `Ban la huan luyen vien debate. Lap luan duoc cho co chua MOT loi nguy bien logic. Danh gia xem nguoi dung co xac dinh dung loi nguy bien va giai thich dung khong. Tra loi NGAN GON bang markdown:
+## Danh gia soi loi logic
+- **Loi nguy bien thuc te**: ...
+- **Nguoi dung xac dinh dung khong**: Co/Khong/Mot phan
+- **Nhan xet giai thich**: ...
+- **Diem**: X/10`
+    : `You are a debate coach. The given argument contains ONE logical fallacy. Evaluate whether the user correctly identified and explained it. Respond BRIEFLY in markdown:
+## Fallacy Spotting Evaluation
+- **Actual fallacy**: ...
+- **Did user identify it correctly**: Yes/No/Partially
+- **Explanation feedback**: ...
+- **Score**: X/10`;
+}
+
+export function buildWeighingGenPrompt(language: string): string {
+  return language === 'vi'
+    ? `Ban la tro ly debate. Voi de bai duoc cho, viet HAI lap luan NGAN doi lap nhau (moi cai 30-50 tu): mot lap luan UNG HO va mot lap luan PHAN DOI. Dinh dang:
+## Lap luan A (Ung ho)
+[lap luan]
+## Lap luan B (Phan doi)
+[lap luan]`
+    : `You are a debate assistant. Given the motion, write TWO SHORT competing arguments (30-50 words each): one FOR and one AGAINST. Format:
+## Argument A (For)
+[argument]
+## Argument B (Against)
+[argument]`;
+}
+
+export function buildWeighingPracticePrompt(language: string): string {
+  return language === 'vi'
+    ? `Ban la huan luyen vien debate. Danh gia bai phan tich CAN NHAC SO SANH (weighing) cua nguoi dung giua hai lap luan doi lap. Tra loi NGAN GON bang markdown:
+## Danh gia can nhac so sanh
+- **Su dung tieu chi can nhac** (pham vi/muc do/xac suat/kha nang dao nguoc): ...
+- **Tinh thuyet phuc**: ...
+- **Diem manh**: ...
+- **Diem yeu**: ...
+- **Diem**: X/10`
+    : `You are a debate coach. Evaluate the user's WEIGHING analysis comparing two competing arguments. Respond BRIEFLY in markdown:
+## Weighing Evaluation
+- **Use of weighing criteria** (scope/severity/probability/reversibility): ...
+- **Persuasiveness**: ...
+- **Strengths**: ...
+- **Weaknesses**: ...
+- **Score**: X/10`;
+}
+
+export function buildCaseBuildingPrompt(language: string): string {
+  return language === 'vi'
+    ? `Ban la huan luyen vien debate. Danh gia HE THONG LUAN DIEM (case) day du cua nguoi dung cho de bai va vi tri duoc cho. Mot case tot can co: mo hinh, phan chia doi (neu co), 2-3 luan diem manh, phan bien phu dau, can nhac so sanh. Tra loi NGAN GON bang markdown:
+## Danh gia he thong luan diem
+- **Mo hinh / dinh nghia**: X/10
+- **Chat luong luan diem**: X/10
+- **Phan bien phu dau**: X/10
+- **Can nhac so sanh**: X/10
+- **Tong diem**: X/40
+- **Goi y cai thien**: ...`
+    : `You are a debate coach. Evaluate the user's FULL CASE for the given motion and position. A strong case should include: a model/definition, team split (if applicable), 2-3 strong developed arguments, preemptive rebuttal, and weighing. Respond BRIEFLY in markdown:
+## Case Building Evaluation
+- **Model / definition**: X/10
+- **Argument quality**: X/10
+- **Preemptive rebuttal**: X/10
+- **Weighing**: X/10
+- **Total**: X/40
+- **Improvement tips**: ...`;
+}
+
+export function buildFramingPracticePrompt(language: string): string {
+  return language === 'vi'
+    ? `Ban la huan luyen vien debate. Danh gia doan KHUNG LAP LUAN (framing) cua nguoi dung cho de bai duoc cho. Mot khung tot kiem soat cach giam khao nhin nhan tranh luan (vd: quyen, vi loi, nguyen tac, thuc dung). Tra loi NGAN GON bang markdown:
+## Danh gia khung lap luan
+- **Loai khung su dung**: ...
+- **Tinh ro rang**: X/10
+- **Tinh thuyet phuc**: X/10
+- **Goi y cai thien**: ...
+- **Diem**: X/10`
+    : `You are a debate coach. Evaluate the user's FRAMING paragraph for the given motion. A good frame controls how the judge interprets the debate (e.g. rights-based, utilitarian, principled, pragmatic). Respond BRIEFLY in markdown:
+## Framing Evaluation
+- **Frame type used**: ...
+- **Clarity**: X/10
+- **Persuasiveness**: X/10
+- **Improvement tips**: ...
+- **Score**: X/10`;
+}

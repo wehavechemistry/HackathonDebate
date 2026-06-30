@@ -15,6 +15,10 @@ export interface User {
     pois: number;
     keywordBattles: number;
     debates: number;
+    fallacySpotting: number;
+    weighing: number;
+    caseBuilding: number;
+    framing: number;
   };
   banned: boolean;
   unlockedLessonIds?: string[];
