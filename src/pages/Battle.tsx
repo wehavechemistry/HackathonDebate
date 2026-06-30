@@ -1023,30 +1023,22 @@ export default function Battle() {
                   <button
                     onClick={() => submitSpeech()}
                     disabled={!inputText.trim() || currentTurn !== 'user' || isLoading}
-                    className="flex-1 px-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-all disabled:opacity-50 shadow-sm hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center"
-                    title={t('battle.submit', language)}
+                    className="flex-1 px-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-all disabled:opacity-50 shadow-sm hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1.5 text-sm font-medium"
                   >
                     <Send size={16} />
+                    {t('battle.submit', language)}
                   </button>
                   <button
                     onClick={toggleListening}
                     disabled={currentTurn !== 'user' || isLoading}
-                    className={`p-3 rounded-xl transition-all flex items-center justify-center ${
+                    className={`flex-1 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 text-sm font-medium ${
                       isListening
                         ? 'bg-red-500 hover:bg-red-600 text-white border border-red-500 animate-pulse'
                         : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
                     }`}
-                    title={isListening ? (language === 'vi' ? 'Dừng thu âm' : 'Stop recording') : (language === 'vi' ? 'Thu âm giọng nói' : 'Voice input')}
                   >
                     {isListening ? <MicOff size={16} /> : <Mic size={16} />}
-                  </button>
-                  <button
-                    onClick={requestHint}
-                    disabled={isLoading}
-                    className="p-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-yellow-600 dark:text-yellow-400 border border-slate-200 dark:border-slate-800 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center"
-                    title={t('battle.hint', language)}
-                  >
-                    <Lightbulb size={16} />
+                    {language === 'vi' ? 'Ghi âm' : 'Record'}
                   </button>
                 </div>
               </div>
@@ -1063,11 +1055,21 @@ export default function Battle() {
               )}
 
               <div className="flex justify-between items-center px-1">
-                <p className="text-xs text-slate-400 dark:text-slate-500">
-                  {language === 'vi' 
-                    ? `Đã dùng ${hintsUsed} gợi ý | Nhấn Ctrl+Enter để gửi` 
-                    : `Hints used: ${hintsUsed} | Ctrl+Enter to send`}
-                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={requestHint}
+                    disabled={isLoading}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-yellow-600 dark:text-yellow-400 border border-slate-200 dark:border-slate-800 rounded-lg transition-all disabled:opacity-50 flex items-center gap-1.5 text-xs font-semibold"
+                  >
+                    <Lightbulb size={14} />
+                    {t('battle.hint', language)}
+                  </button>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
+                    {language === 'vi' 
+                      ? `Đã dùng ${hintsUsed} gợi ý` 
+                      : `Hints used: ${hintsUsed}`}
+                  </p>
+                </div>
                 <button
                   onClick={endDebate}
                   className="px-4 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-650 dark:text-red-400 text-xs font-semibold rounded-lg border border-red-500/20 transition-all"
