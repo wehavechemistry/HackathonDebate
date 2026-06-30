@@ -47,6 +47,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
   } else {
     console.log('Connected to the SQLite database.');
     initializeDatabase();
+    migrateDatabase();
   }
 });
 
@@ -136,6 +137,26 @@ const dbAll = (sql, params = []) => {
   });
 };
 
+async function migrateDatabase() {
+  // Add columns that may not exist in older databases (ALTER TABLE has no IF NOT EXISTS)
+  const migrations = [
+    `ALTER TABLE users ADD COLUMN trainingScores TEXT NOT NULL DEFAULT '{"rebuttals":0,"speeches":0,"pois":0,"keywordBattles":0,"debates":0,"fallacySpotting":0,"weighing":0,"caseBuilding":0,"framing":0}'`,
+    `ALTER TABLE users ADD COLUMN totalXp INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN streak INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN lastTrainingDate TEXT DEFAULT NULL`,
+    `ALTER TABLE users ADD COLUMN tier TEXT NOT NULL DEFAULT 'bronze'`,
+    `ALTER TABLE users ADD COLUMN unlockedLessonIds TEXT NOT NULL DEFAULT '[]'`,
+  ];
+  for (const sql of migrations) {
+    try {
+      await dbRun(sql);
+      console.log('Migration OK:', sql.slice(0, 60));
+    } catch (e) {
+      // column already exists — ignore
+    }
+  }
+}
+
 async function initializeDatabase() {
   // Create tables
   await dbRun(`
@@ -151,7 +172,12 @@ async function initializeDatabase() {
       savedNotes TEXT NOT NULL DEFAULT '[]',
       recentActivity TEXT NOT NULL DEFAULT '[]',
       botStars TEXT NOT NULL DEFAULT '{}',
-      trainingStats TEXT NOT NULL DEFAULT '{"rebuttals":0,"speeches":0,"pois":0,"keywordBattles":0,"debates":0}',
+    trainingStats TEXT NOT NULL DEFAULT '{"rebuttals":0,"speeches":0,"pois":0,"keywordBattles":0,"debates":0}',
+      trainingScores TEXT NOT NULL DEFAULT '{"rebuttals":0,"speeches":0,"pois":0,"keywordBattles":0,"debates":0,"fallacySpotting":0,"weighing":0,"caseBuilding":0,"framing":0}',
+      totalXp INTEGER NOT NULL DEFAULT 0,
+      streak INTEGER NOT NULL DEFAULT 0,
+      lastTrainingDate TEXT DEFAULT NULL,
+      tier TEXT NOT NULL DEFAULT 'bronze',
       banned INTEGER NOT NULL DEFAULT 0,
       unlockedLessonIds TEXT NOT NULL DEFAULT '[]'
     )
@@ -236,8 +262,8 @@ async function seedDatabase() {
     console.log('Seeding default admin user...');
     const hashed = await bcrypt.hash('admin123', 10);
     await dbRun(`
-      INSERT INTO users (id, email, username, password_hash, role, joinDate, completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats, banned)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (id, email, username, password_hash, role, joinDate, completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats, banned, trainingScores, totalXp, streak, lastTrainingDate, tier, unlockedLessonIds)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       'admin_1',
       'dodungtri402@gmail.com',
@@ -251,7 +277,13 @@ async function seedDatabase() {
       '[]',
       '{}',
       JSON.stringify({ rebuttals: 0, speeches: 0, pois: 0, keywordBattles: 0, debates: 0, fallacySpotting: 0, weighing: 0, caseBuilding: 0, framing: 0 }),
-      0
+      0,
+      JSON.stringify({ rebuttals: 0, speeches: 0, pois: 0, keywordBattles: 0, debates: 0, fallacySpotting: 0, weighing: 0, caseBuilding: 0, framing: 0 }),
+      0,
+      0,
+      null,
+      'bronze',
+      '[]'
     ]);
     // Note: We hash password 'admin123' for actual login
     await dbRun('UPDATE users SET password_hash = ? WHERE id = ?', [hashed, 'admin_1']);
@@ -463,6 +495,11 @@ function mapUserRow(row) {
     recentActivity: JSON.parse(row.recentActivity || '[]'),
     botStars: JSON.parse(row.botStars || '{}'),
     trainingStats: JSON.parse(row.trainingStats || '{"rebuttals":0,"speeches":0,"pois":0,"keywordBattles":0,"debates":0,"fallacySpotting":0,"weighing":0,"caseBuilding":0,"framing":0}'),
+    trainingScores: JSON.parse(row.trainingScores || '{"rebuttals":0,"speeches":0,"pois":0,"keywordBattles":0,"debates":0,"fallacySpotting":0,"weighing":0,"caseBuilding":0,"framing":0}'),
+    totalXp: row.totalXp || 0,
+    streak: row.streak || 0,
+    lastTrainingDate: row.lastTrainingDate || null,
+    tier: row.tier || 'bronze',
     banned: !!row.banned,
     unlockedLessonIds: JSON.parse(row.unlockedLessonIds || '[]')
   };
@@ -511,8 +548,8 @@ app.post('/api/auth/register', async (req, res) => {
     };
 
     await dbRun(`
-      INSERT INTO users (id, email, username, password_hash, role, joinDate, completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats, banned)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (id, email, username, password_hash, role, joinDate, completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats, banned, trainingScores, totalXp, streak, lastTrainingDate, tier, unlockedLessonIds)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       newUser.id,
       newUser.email,
@@ -526,7 +563,13 @@ app.post('/api/auth/register', async (req, res) => {
       newUser.recentActivity,
       newUser.botStars,
       newUser.trainingStats,
-      newUser.banned
+      newUser.banned,
+      JSON.stringify({ rebuttals: 0, speeches: 0, pois: 0, keywordBattles: 0, debates: 0, fallacySpotting: 0, weighing: 0, caseBuilding: 0, framing: 0 }),
+      0,
+      0,
+      null,
+      'bronze',
+      '[]'
     ]);
 
     const createdUser = await dbGet('SELECT * FROM users WHERE id = ?', [userId]);
@@ -758,6 +801,11 @@ app.put('/api/auth/profile', async (req, res) => {
     const recentActivity = updates.recentActivity !== undefined ? JSON.stringify(updates.recentActivity) : userRow.recentActivity;
     const botStars = updates.botStars !== undefined ? JSON.stringify(updates.botStars) : userRow.botStars;
     const trainingStats = updates.trainingStats !== undefined ? JSON.stringify(updates.trainingStats) : userRow.trainingStats;
+    const trainingScores = updates.trainingScores !== undefined ? JSON.stringify(updates.trainingScores) : userRow.trainingScores;
+    const totalXp = updates.totalXp !== undefined ? updates.totalXp : userRow.totalXp;
+    const streak = updates.streak !== undefined ? updates.streak : userRow.streak;
+    const lastTrainingDate = updates.lastTrainingDate !== undefined ? updates.lastTrainingDate : userRow.lastTrainingDate;
+    const tier = updates.tier !== undefined ? updates.tier : userRow.tier;
 
     await dbRun(`
       UPDATE users SET
@@ -766,9 +814,14 @@ app.put('/api/auth/profile', async (req, res) => {
         savedNotes = ?,
         recentActivity = ?,
         botStars = ?,
-        trainingStats = ?
+        trainingStats = ?,
+        trainingScores = ?,
+        totalXp = ?,
+        streak = ?,
+        lastTrainingDate = ?,
+        tier = ?
       WHERE id = ?
-    `, [completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats, req.session.userId]);
+    `, [completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats, trainingScores, totalXp, streak, lastTrainingDate, tier, req.session.userId]);
 
     const updatedRow = await dbGet('SELECT * FROM users WHERE id = ?', [req.session.userId]);
     res.json({ success: true, user: mapUserRow(updatedRow) });
@@ -791,7 +844,7 @@ app.get('/api/admin/users', async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const users = await dbAll('SELECT id, email, username, role, joinDate, banned, completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats FROM users');
+    const users = await dbAll('SELECT id, email, username, role, joinDate, banned, completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats, trainingScores, totalXp, streak, lastTrainingDate, tier, unlockedLessonIds FROM users');
     res.json({ users: users.map(mapUserRow) });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
@@ -855,8 +908,8 @@ app.post('/api/admin/create-admin', async (req, res) => {
     const userId = 'admin_' + Date.now();
 
     await dbRun(`
-      INSERT INTO users (id, email, username, password_hash, role, joinDate, completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats, banned)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+      INSERT INTO users (id, email, username, password_hash, role, joinDate, completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats, banned, trainingScores, totalXp, streak, lastTrainingDate, tier, unlockedLessonIds)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
     `, [
       userId,
       email,
@@ -869,7 +922,14 @@ app.post('/api/admin/create-admin', async (req, res) => {
       '[]',
       '[]',
       '{}',
-      JSON.stringify({ rebuttals: 0, speeches: 0, pois: 0, keywordBattles: 0, debates: 0, fallacySpotting: 0, weighing: 0, caseBuilding: 0, framing: 0 })
+      JSON.stringify({ rebuttals: 0, speeches: 0, pois: 0, keywordBattles: 0, debates: 0, fallacySpotting: 0, weighing: 0, caseBuilding: 0, framing: 0 }),
+      0,
+      JSON.stringify({ rebuttals: 0, speeches: 0, pois: 0, keywordBattles: 0, debates: 0, fallacySpotting: 0, weighing: 0, caseBuilding: 0, framing: 0 }),
+      0,
+      0,
+      null,
+      'bronze',
+      '[]'
     ]);
 
     res.json({ success: true });

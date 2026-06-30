@@ -60,6 +60,9 @@ interface AppState {
   deleteNote: (noteId: string) => Promise<void>;
   setBotStars: (botId: string, stars: number) => Promise<void>;
   incrementTrainingStat: (stat: 'rebuttals' | 'speeches' | 'pois' | 'keywordBattles' | 'debates' | 'fallacySpotting' | 'weighing' | 'caseBuilding' | 'framing') => Promise<void>;
+  addTrainingScore: (stat: 'rebuttals' | 'speeches' | 'pois' | 'keywordBattles' | 'debates' | 'fallacySpotting' | 'weighing' | 'caseBuilding' | 'framing', xp: number) => Promise<void>;
+  updateStreak: () => Promise<void>;
+  penalizeTraining: (xp: number) => Promise<void>;
   fetchUsers: () => Promise<void>;
   isLessonUnlocked: (lessonId: string) => boolean;
   getNextLesson: (lessonId: string) => Lesson | null;
@@ -73,6 +76,12 @@ function loadLocalConfig() {
     if (raw) return JSON.parse(raw);
   } catch {}
   return {};
+}
+
+function yesterday() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
 }
 
 function saveLocalConfig(config: { theme?: string; language?: string }) {
@@ -600,6 +609,56 @@ export const useStore = create<AppState>((set, get) => ({
         ...state.currentUser.trainingStats,
         [stat]: current + 1,
       },
+    };
+    await state.updateCurrentUser(updated);
+  },
+
+  addTrainingScore: async (stat, xp) => {
+    const state = get();
+    if (!state.currentUser) return;
+    const curScore = state.currentUser.trainingScores[stat] || 0;
+    const newTotal = Math.max(0, (state.currentUser.totalXp || 0) + xp);
+    const tier = newTotal < 100 ? 'bronze' as const : newTotal < 500 ? 'silver' as const : newTotal < 2000 ? 'gold' as const : 'diamond' as const;
+
+    // streak
+    const today = new Date().toISOString().slice(0, 10);
+    const last = state.currentUser.lastTrainingDate;
+    let streak = state.currentUser.streak || 0;
+    if (last !== today) {
+      if (last === yesterday()) {
+        streak += 1;
+      } else {
+        streak = 1;
+      }
+    }
+
+    const updated = {
+      ...state.currentUser,
+      totalXp: newTotal,
+      tier,
+      streak,
+      lastTrainingDate: today,
+      trainingScores: {
+        ...state.currentUser.trainingScores,
+        [stat]: curScore + Math.max(0, xp),
+      },
+    };
+    await state.updateCurrentUser(updated);
+  },
+
+  updateStreak: async () => {
+    // merged into addTrainingScore — kept for API compat, no-op
+  },
+
+  penalizeTraining: async (xp) => {
+    const state = get();
+    if (!state.currentUser) return;
+    const newTotal = Math.max(0, (state.currentUser.totalXp || 0) - Math.abs(xp));
+    const tier = newTotal < 100 ? 'bronze' as const : newTotal < 500 ? 'silver' as const : newTotal < 2000 ? 'gold' as const : 'diamond' as const;
+    const updated = {
+      ...state.currentUser,
+      totalXp: newTotal,
+      tier,
     };
     await state.updateCurrentUser(updated);
   },

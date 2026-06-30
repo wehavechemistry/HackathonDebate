@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Shuffle, Send, ArrowRight } from 'lucide-react';
+import { Shuffle, Send, ArrowRight, Award, Flame, Zap } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import {
@@ -23,7 +23,11 @@ import type { DebateMotion } from '../types';
 type Mode = 'menu' | 'rebuttal' | 'speech' | 'poi' | 'keyword' | 'fallacy' | 'weighing' | 'case' | 'framing';
 
 export default function Training() {
-  const { language, motions, aiConfigured, addActivity, incrementTrainingStat } = useStore();
+  const store = useStore();
+  const { language, motions, aiConfigured, addActivity, incrementTrainingStat, addTrainingScore, penalizeTraining } = store;
+  const totalXp = store.currentUser?.totalXp || 0;
+  const tier = store.currentUser?.tier || 'bronze';
+  const streak = store.currentUser?.streak || 0;
 
   const [mode, setMode] = useState<Mode>('menu');
   const [difficulty, setDifficulty] = useState<'easy' | 'intermediate' | 'hard'>('easy');
@@ -125,6 +129,7 @@ export default function Training() {
     setStep('feedback');
     setIsLoading(false);
     incrementTrainingStat('rebuttals');
+    await addTrainingScore('rebuttals', 25);
     addActivity({ type: 'training', title: language === 'vi' ? 'Luy\u1ec7n ph\u1ea3n bi\u1ec7n' : 'Rebuttal Practice' });
   };
 
@@ -142,6 +147,7 @@ export default function Training() {
     setStep('feedback');
     setIsLoading(false);
     incrementTrainingStat('speeches');
+    await addTrainingScore('speeches', 30);
     addActivity({ type: 'training', title: language === 'vi' ? 'Luy\u1ec7n di\u1ec5n thuy\u1ebft' : 'Speech Practice' });
   };
 
@@ -157,6 +163,7 @@ export default function Training() {
     setStep('feedback');
     setIsLoading(false);
     incrementTrainingStat('pois');
+    await addTrainingScore('pois', 20);
     addActivity({ type: 'training', title: language === 'vi' ? 'Luy\u1ec7n POI' : 'POI Practice' });
   };
 
@@ -173,6 +180,7 @@ export default function Training() {
     setStep('feedback');
     setIsLoading(false);
     incrementTrainingStat('keywordBattles');
+    await addTrainingScore('keywordBattles', 15);
     addActivity({ type: 'training', title: language === 'vi' ? 'Tr\u1eadn t\u1eeb kh\u00f3a' : 'Keyword Battle' });
   };
 
@@ -188,6 +196,7 @@ export default function Training() {
     setStep('feedback');
     setIsLoading(false);
     incrementTrainingStat('fallacySpotting');
+    await addTrainingScore('fallacySpotting', 25);
     addActivity({ type: 'training', title: language === 'vi' ? 'Soi l\u1ed7i logic' : 'Fallacy Spotting' });
   };
 
@@ -203,6 +212,7 @@ export default function Training() {
     setStep('feedback');
     setIsLoading(false);
     incrementTrainingStat('weighing');
+    await addTrainingScore('weighing', 25);
     addActivity({ type: 'training', title: language === 'vi' ? 'Luy\u1ec7n c\u00e2n nh\u1eafc so s\u00e1nh' : 'Weighing Practice' });
   };
 
@@ -220,6 +230,7 @@ export default function Training() {
     setStep('feedback');
     setIsLoading(false);
     incrementTrainingStat('caseBuilding');
+    await addTrainingScore('caseBuilding', 35);
     addActivity({ type: 'training', title: language === 'vi' ? 'X\u00e2y d\u1ef1ng h\u1ec7 th\u1ed1ng lu\u1eadn \u0111i\u1ec3m' : 'Case Building' });
   };
 
@@ -237,6 +248,7 @@ export default function Training() {
     setStep('feedback');
     setIsLoading(false);
     incrementTrainingStat('framing');
+    await addTrainingScore('framing', 25);
     addActivity({ type: 'training', title: language === 'vi' ? 'Luy\u1ec7n khung l\u1eadp lu\u1eadn' : 'Framing Practice' });
   };
 
@@ -259,6 +271,13 @@ export default function Training() {
       { key: 'framing', title: t('training.framing', language), desc: t('training.framing.desc', language), color: 'from-pink-500 to-rose-600' },
     ];
 
+    const xpForNext = tier === 'bronze' ? 100 : tier === 'silver' ? 500 : tier === 'gold' ? 2000 : 5000;
+    const xpProgress = Math.min(totalXp / xpForNext, 1);
+    const tierColor = tier === 'bronze' ? 'text-amber-600' : tier === 'silver' ? 'text-slate-300' : tier === 'gold' ? 'text-yellow-400' : 'text-cyan-400';
+    const tierLabel = language === 'vi'
+      ? ({ bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', diamond: 'Kim Cương' }[tier] || 'Đồng')
+      : tier.charAt(0).toUpperCase() + tier.slice(1);
+
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center gap-4 mb-8">
@@ -267,6 +286,35 @@ export default function Training() {
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">{t('training.title', language)}</h1>
         </div>
+
+        {/* XP / Tier / Streak bar */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/40">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Zap size={14} className="text-orange-400" />
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">XP</span>
+            </div>
+            <p className="text-base font-bold text-white">{totalXp} <span className="text-xs font-normal text-slate-500">/ {xpForNext}</span></p>
+            <div className="mt-1.5 h-1.5 rounded-full bg-slate-700 overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all" style={{ width: `${xpProgress * 100}%` }} />
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/40">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Award size={14} className="text-yellow-400" />
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">{language === 'vi' ? 'Hạng' : 'Tier'}</span>
+            </div>
+            <p className={`text-base font-bold ${tierColor}`}>{tierLabel}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/40">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Flame size={14} className="text-red-400" />
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">{language === 'vi' ? 'Chuỗi' : 'Streak'}</span>
+            </div>
+            <p className="text-base font-bold text-white">{streak} <span className="text-xs font-normal text-slate-500">{language === 'vi' ? 'ngày' : 'days'}</span></p>
+          </div>
+        </div>
+
         <div className="grid sm:grid-cols-2 gap-4">
           {modes.map((m, i) => (
             <motion.button

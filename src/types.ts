@@ -20,6 +20,21 @@ export interface User {
     caseBuilding: number;
     framing: number;
   };
+  trainingScores: {
+    rebuttals: number;
+    speeches: number;
+    pois: number;
+    keywordBattles: number;
+    debates: number;
+    fallacySpotting: number;
+    weighing: number;
+    caseBuilding: number;
+    framing: number;
+  };
+  totalXp: number;
+  streak: number;
+  lastTrainingDate: string | null;
+  tier: 'bronze' | 'silver' | 'gold' | 'diamond';
   banned: boolean;
   unlockedLessonIds?: string[];
 }
