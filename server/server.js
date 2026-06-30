@@ -50,6 +50,62 @@ const db = new sqlite3.Database(dbPath, (err) => {
   }
 });
 
+// Separate connection to the user-provided motions database (motions.db)
+// This file has its own schema: motions (id INTEGER PK, motion TEXT, category TEXT)
+const motionsDbPath = path.resolve(__dirname, 'motions.db');
+const motionsDb = new sqlite3.Database(motionsDbPath, sqlite3.OPEN_READONLY, (err) => {
+  if (err) {
+    console.error('Error opening motions.db. Make sure the file exists at', motionsDbPath, err);
+  } else {
+    console.log('Connected to motions.db at', motionsDbPath);
+  }
+});
+
+// Helper to get all rows from motions.db as a promise
+const motionsDbAll = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    motionsDb.all(sql, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+};
+
+// Difficulty tiers used to spread motions.db rows across easy/intermediate/hard
+// so the frontend's difficulty filter (Battle.tsx) has motions in every bucket.
+const DIFFICULTY_TIERS = ['easy', 'intermediate', 'hard'];
+function deriveDifficulty(id) {
+  return DIFFICULTY_TIERS[id % DIFFICULTY_TIERS.length];
+}
+
+// Normalize free-form categories from motions.db (e.g. "Artificial Intelligence",
+// "Climate Change") into lowercase slug form, consistent with how the rest of the
+// app (topics table, i18n topics.* keys) represents categories.
+function normalizeCategory(category) {
+  if (!category) return 'misc';
+  return category
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'misc';
+}
+
+// Fetch and map all motions from motions.db into the shape the frontend expects
+// (DebateMotion: id, motion_en, motion_vi, difficulty, category).
+// motions.db has no Vietnamese translation column, so motion_vi falls back to
+// the same English text rather than being left blank.
+async function getMotionsFromMotionsDb() {
+  const rows = await motionsDbAll('SELECT id, motion, category FROM motions ORDER BY id ASC');
+  return rows.map(row => ({
+    id: String(row.id),
+    motion_en: row.motion,
+    motion_vi: row.motion,
+    difficulty: deriveDifficulty(row.id),
+    category: normalizeCategory(row.category),
+  }));
+}
+
 // Helper to run query as a promise
 const dbRun = (sql, params = []) => {
   return new Promise((resolve, reject) => {
@@ -143,15 +199,10 @@ async function initializeDatabase() {
     )
   `);
 
-  await dbRun(`
-    CREATE TABLE IF NOT EXISTS motions (
-      id TEXT PRIMARY KEY,
-      motion_en TEXT NOT NULL,
-      motion_vi TEXT NOT NULL,
-      difficulty TEXT NOT NULL,
-      category TEXT NOT NULL
-    )
-  `);
+  // NOTE: motions are no longer stored in debatecrab.sqlite. They are read
+  // directly from the user-provided server/motions.db file (see
+  // getMotionsFromMotionsDb / GET /api/content below). The old `motions`
+  // table and its default seed data have been removed.
 
   await dbRun(`
     CREATE TABLE IF NOT EXISTS announcements (
@@ -392,53 +443,8 @@ async function seedDatabase() {
     }
   }
 
-  // Seed motions if empty
-  const motionCount = await dbGet('SELECT COUNT(*) as count FROM motions');
-  if (motionCount.count === 0) {
-    console.log('Seeding default motions...');
-    const defaultMotions = [
-      { id: 'e1', motion_en: 'THW ban homework for primary school students', motion_vi: 'TNCN cấm bài tập về nhà cho học sinh tiểu học', difficulty: 'easy', category: 'education' },
-      { id: 'e2', motion_en: 'THW make school uniforms optional', motion_vi: 'TNCN để đồng phục học sinh là tự chọn', difficulty: 'easy', category: 'education' },
-      { id: 'e3', motion_en: 'THW allow students to use phones in class', motion_vi: 'TNCN cho phép học sinh dùng điện thoại trong lớp', difficulty: 'easy', category: 'education' },
-      { id: 'e4', motion_en: 'THW ban violent video games for children', motion_vi: 'TNCN cấm trò chơi điện tử bạo lực cho trẻ em', difficulty: 'easy', category: 'society' },
-      { id: 'e5', motion_en: 'THBT social media does more harm than good', motion_vi: 'TN tin rằng mạng xã hội gây hại nhiều hơn lợi', difficulty: 'easy', category: 'society' },
-      { id: 'e6', motion_en: 'THW lower the voting age to 16', motion_vi: 'TNCN hạ tuổi bầu cử xuống 16', difficulty: 'easy', category: 'politics' },
-      { id: 'e7', motion_en: 'THW ban zoos', motion_vi: 'TNCN cấm vườn thú', difficulty: 'easy', category: 'environment' },
-      { id: 'e8', motion_en: 'THW make public transport free', motion_vi: 'TNCN miễn phí giao thông công cộng', difficulty: 'easy', category: 'economics' },
-      { id: 'e9', motion_en: 'THW ban fast food advertising to children', motion_vi: 'TNCN cấm quảng cáo đồ ăn nhanh cho trẻ em', difficulty: 'easy', category: 'media' },
-      { id: 'e10', motion_en: 'THW make recycling mandatory', motion_vi: 'TNCN bắt buộc tái chế', difficulty: 'easy', category: 'environment' },
-      { id: 'e11', motion_en: 'THW ban animal testing for cosmetics', motion_vi: 'TNCN cấm thí nghiệm trên động vật cho mỹ phẩm', difficulty: 'easy', category: 'environment' },
-      { id: 'i1', motion_en: 'THW implement universal basic income', motion_vi: 'TNCN thực hiện thu nhập cơ bản phổ thông', difficulty: 'intermediate', category: 'economics' },
-      { id: 'i2', motion_en: 'THBT governments should regulate AI development', motion_vi: 'TN tin rằng chính phủ nên quản lý phát triển AI', difficulty: 'intermediate', category: 'technology' },
-      { id: 'i3', motion_en: 'THW abolish standardized testing in education', motion_vi: 'TNCN bãi bỏ thi chuẩn hóa trong giáo dục', difficulty: 'intermediate', category: 'education' },
-      { id: 'i4', motion_en: 'THBT cancel culture does more harm than good', motion_vi: 'TN tin rằng văn hóa tẩy chay gây hại nhiều hơn lợi', difficulty: 'intermediate', category: 'culture' },
-      { id: 'i5', motion_en: 'THW make voting compulsory', motion_vi: 'TNCN bắt buộc bầu cử', difficulty: 'intermediate', category: 'politics' },
-      { id: 'i6', motion_en: 'THBT developing nations should prioritize economic growth over environmental protection', motion_vi: 'TN tin rằng các nước đang phát triển nên ưu tiên tăng trưởng kinh tế hơn bảo vệ môi trường', difficulty: 'intermediate', category: 'economics' },
-      { id: 'i7', motion_en: 'THW ban the use of facial recognition by police', motion_vi: 'TNCN cấm cảnh sát sử dụng nhận diện khuôn mặt', difficulty: 'intermediate', category: 'technology' },
-      { id: 'i8', motion_en: 'THW legalize all drugs and regulate them', motion_vi: 'TNCN hợp pháp hóa và quản lý tất cả chất gây nghiện', difficulty: 'intermediate', category: 'society' },
-      { id: 'i9', motion_en: 'THW introduce a sugar tax', motion_vi: 'TNCN áp thuế đường', difficulty: 'intermediate', category: 'economics' },
-      { id: 'i10', motion_en: 'THBT the media should not report on the private lives of politicians', motion_vi: 'TN tin rằng truyền thông không nên đưa tin về đời tư chính trị gia', difficulty: 'intermediate', category: 'media' },
-      { id: 'i11', motion_en: 'THW prioritize renewable energy over nuclear power', motion_vi: 'TNCN ưu tiên năng lượng tái tạo hơn điện hạt nhân', difficulty: 'intermediate', category: 'environment' },
-      { id: 'h1', motion_en: 'THW allow countries to buy and sell carbon emission rights', motion_vi: 'TNCN cho phép các nước mua bán quyền phát thải carbon', difficulty: 'hard', category: 'environment' },
-      { id: 'h2', motion_en: 'THBT the international community should intervene militarily to prevent genocide', motion_vi: 'TN tin rằng cộng đồng quốc tế nên can thiệp quân sự để ngăn chặn diệt chủng', difficulty: 'hard', category: 'politics' },
-      { id: 'h3', motion_en: 'THW give AI systems legal personhood', motion_vi: 'TNCN trao tư cách pháp nhân cho hệ thống AI', difficulty: 'hard', category: 'technology' },
-      { id: 'h4', motion_en: 'THBT liberal democracies should not trade with authoritarian regimes', motion_vi: 'TN tin rằng các nền dân chủ tự do không nên giao thương với chế độ độc tài', difficulty: 'hard', category: 'politics' },
-      { id: 'h5', motion_en: 'THW abolish intellectual property rights', motion_vi: 'TNCN bãi bỏ quyền sở hữu trí tuệ', difficulty: 'hard', category: 'economics' },
-      { id: 'h6', motion_en: 'THBT cultural relativism is morally bankrupt', motion_vi: 'TN tin rằng chủ nghĩa tương đối văn hóa là sai lầm về đạo đức', difficulty: 'hard', category: 'culture' },
-      { id: 'h7', motion_en: 'THW allow the genetic modification of human embryos', motion_vi: 'TNCN cho phép chỉnh sửa gen phôi người', difficulty: 'hard', category: 'technology' },
-      { id: 'h8', motion_en: 'THBT nations should open all borders', motion_vi: 'TN tin rằng các quốc gia nên mở cửa biên giới', difficulty: 'hard', category: 'politics' },
-      { id: 'h9', motion_en: 'THW replace prisons with rehabilitation centers', motion_vi: 'TNCN thay thế nhà tù bằng trung tâm cải tạo', difficulty: 'hard', category: 'society' },
-      { id: 'h10', motion_en: 'THBT capitalism is inherently exploitative', motion_vi: 'TN tin rằng chủ nghĩa tư bản về bản chất là bóc lột', difficulty: 'hard', category: 'economics' },
-      { id: 'h11', motion_en: 'THW grant nature legal rights', motion_vi: 'TNCN trao quyền pháp lý cho tự nhiên', difficulty: 'hard', category: 'environment' }
-    ];
-
-    for (const m of defaultMotions) {
-      await dbRun(`
-        INSERT OR REPLACE INTO motions (id, motion_en, motion_vi, difficulty, category)
-        VALUES (?, ?, ?, ?, ?)
-      `, [m.id, m.motion_en, m.motion_vi, m.difficulty, m.category]);
-    }
-  }
+  // Motions are sourced live from motions.db (see getMotionsFromMotionsDb),
+  // so there is no seeding step for them here anymore.
 }
 
 // AI configuration helpers
@@ -843,7 +849,7 @@ app.get('/api/content', async (req, res) => {
     const lessons = await dbAll('SELECT * FROM lessons ORDER BY order_num ASC');
     const topics = await dbAll('SELECT * FROM topics');
     const bots = await dbAll('SELECT * FROM bots');
-    const motions = await dbAll('SELECT * FROM motions');
+    const motions = await getMotionsFromMotionsDb();
     const announcements = await dbAll('SELECT * FROM announcements ORDER BY createdAt DESC');
 
     res.json({

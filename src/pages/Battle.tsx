@@ -327,7 +327,21 @@ export default function Battle() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const categories = ['random', 'education', 'technology', 'environment', 'economics', 'politics', 'society', 'media', 'culture'];
+  const categories = ['random', ...Array.from(new Set(motions.map(m => m.category))).sort()];
+
+  // Convert a category slug (e.g. "artificial_intelligence") into a readable
+  // label ("Artificial Intelligence") when there is no i18n translation for it.
+  const formatCategoryLabel = (slug: string) =>
+    slug
+      .split('_')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+
+  const categoryLabel = (slug: string) => {
+    const translated = t(`topics.${slug}`, language);
+    return translated !== `topics.${slug}` ? translated : formatCategoryLabel(slug);
+  };
 
   const randomizeMotion = useCallback(() => {
     let filtered = motions.filter(m => m.difficulty === difficulty);
@@ -599,7 +613,7 @@ export default function Battle() {
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-900/50 border border-white/[0.06] text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
               >
                 {categories.map(c => (
-                  <option key={c} value={c}>{c === 'random' ? t('battle.random', language) : (t(`topics.${c}`, language) || c)}</option>
+                  <option key={c} value={c}>{c === 'random' ? t('battle.random', language) : categoryLabel(c)}</option>
                 ))}
               </select>
             </div>
@@ -745,7 +759,7 @@ export default function Battle() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="text-[10px] font-bold text-orange-500 dark:text-orange-400 uppercase tracking-widest bg-orange-500/10 px-2 py-0.5 rounded-full">
-                {motion_?.category ? (t(`topics.${motion_.category}`, language) || motion_.category) : 'Debate'}
+                {motion_?.category ? categoryLabel(motion_.category) : 'Debate'}
               </span>
               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
                 {t(`battle.${difficulty}`, language)}
