@@ -21,8 +21,11 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.remove('dark', 'light');
     document.documentElement.classList.add(theme);
+  }, [theme]);
+
+  useEffect(() => {
     initApp();
-  }, [theme, initApp]);
+  }, [initApp]);
 
   if (isLoading) {
     return (
