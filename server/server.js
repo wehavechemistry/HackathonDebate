@@ -216,11 +216,12 @@ async function initializeDatabase() {
   `);
 
   await dbRun(`
-    CREATE TABLE IF NOT EXISTS ai_config (
+    CREATE TABLE IF NOT EXISTS ai_api_keys (
       id TEXT PRIMARY KEY,
       api_key TEXT NOT NULL,
-      model TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
+      model TEXT NOT NULL DEFAULT 'openrouter/auto',
+      priority INTEGER NOT NULL DEFAULT 0,
+      enabled INTEGER NOT NULL DEFAULT 1
     )
   `);
 
@@ -447,20 +448,6 @@ async function seedDatabase() {
   // so there is no seeding step for them here anymore.
 }
 
-// AI configuration helpers
-async function getAiConfig() {
-  const row = await dbGet('SELECT * FROM ai_config WHERE id = ?', ['default']);
-  return row ? { apiKey: row.api_key, model: row.model } : null;
-}
-
-async function setAiConfig(apiKey, model) {
-  const now = new Date().toISOString();
-  await dbRun(
-    `INSERT OR REPLACE INTO ai_config (id, api_key, model, updatedAt) VALUES (?, ?, ?, ?)`,
-    ['default', apiKey, model, now]
-  );
-}
-
 // Map db user row to User object
 function mapUserRow(row) {
   if (!row) return null;
@@ -619,18 +606,23 @@ app.get('/api/auth/me', async (req, res) => {
   }
 });
 
+// AI config helpers — returns all enabled keys sorted by priority
+async function getAiKeys() {
+  return await dbAll('SELECT * FROM ai_api_keys WHERE enabled = 1 ORDER BY priority ASC');
+}
+
 // AI config status endpoint
 app.get('/api/ai/config', async (req, res) => {
   try {
-    const config = await getAiConfig();
-    res.json({ configured: !!config, model: config?.model || 'openrouter/auto' });
+    const keys = await getAiKeys();
+    res.json({ configured: keys.length > 0, count: keys.length });
   } catch (err) {
     console.error('Error fetching AI config', err);
     res.status(500).json({ error: 'Error fetching AI config' });
   }
 });
 
-// Proxy AI chat requests through backend
+// Proxy AI chat requests through backend with fallback across keys
 app.post('/api/ai/chat', async (req, res) => {
   if (!req.session.userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -641,62 +633,105 @@ app.post('/api/ai/chat', async (req, res) => {
     return res.status(400).json({ error: 'Invalid request body' });
   }
 
-  try {
-    const aiConfig = await getAiConfig();
-    if (!aiConfig) {
-      return res.status(503).json({ error: 'AI is not configured' });
-    }
-
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${aiConfig.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: aiConfig.model || 'openrouter/auto',
-        messages,
-        max_tokens: 2048,
-        temperature: 0.7,
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      const message = data?.error?.message || JSON.stringify(data);
-      return res.status(response.status).json({ error: message });
-    }
-
-    res.json(data);
-  } catch (err) {
-    console.error('Error proxying AI chat', err);
-    res.status(500).json({ error: 'Error proxying AI chat' });
+  const keys = await getAiKeys();
+  if (keys.length === 0) {
+    return res.status(503).json({ error: 'AI is not configured' });
   }
+
+  let lastError = null;
+  for (const key of keys) {
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${key.api_key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: key.model || 'openrouter/auto',
+          messages,
+          max_tokens: 2048,
+          temperature: 0.7,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        return res.json(data);
+      }
+
+      lastError = data?.error?.message || JSON.stringify(data);
+      console.warn(`Key ${key.id} failed: ${lastError}`);
+      // continue to next key
+    } catch (err) {
+      lastError = err.message;
+      console.warn(`Key ${key.id} threw: ${lastError}`);
+    }
+  }
+
+  // All keys exhausted
+  console.error('All AI keys exhausted, last error:', lastError);
+  res.status(503).json({ error: lastError || 'All AI keys failed' });
 });
 
-// Admin AI config endpoint
-app.put('/api/admin/ai-config', async (req, res) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const { apiKey, apiModel } = req.body;
-  if (!apiKey || !apiModel) {
-    return res.status(400).json({ error: 'Missing AI configuration values' });
-  }
-
-  try {
-    const adminUser = await dbGet('SELECT role FROM users WHERE id = ?', [req.session.userId]);
-    if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'head_admin')) {
-      return res.status(403).json({ error: 'Forbidden' });
+// AI API keys CRUD (admin only)
+function requireAdmin(req, res) {
+  return new Promise(async (resolve) => {
+    if (!req.session.userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      resolve(false);
+      return;
     }
+    const user = await dbGet('SELECT role FROM users WHERE id = ?', [req.session.userId]);
+    if (!user || (user.role !== 'admin' && user.role !== 'head_admin')) {
+      res.status(403).json({ error: 'Forbidden' });
+      resolve(false);
+      return;
+    }
+    resolve(true);
+  });
+}
 
-    await setAiConfig(apiKey, apiModel);
-    res.json({ success: true, configured: true, model: apiModel });
-  } catch (err) {
-    console.error('Error saving AI config', err);
-    res.status(500).json({ error: 'Error saving AI config' });
-  }
+app.get('/api/admin/ai-keys', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const keys = await dbAll('SELECT id, api_key, model, priority, enabled FROM ai_api_keys ORDER BY priority ASC');
+  res.json({ keys });
+});
+
+app.post('/api/admin/ai-keys', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const { api_key, model, priority } = req.body;
+  if (!api_key) return res.status(400).json({ error: 'api_key is required' });
+  const id = 'key_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  await dbRun(
+    'INSERT INTO ai_api_keys (id, api_key, model, priority, enabled) VALUES (?, ?, ?, ?, 1)',
+    [id, api_key, model || 'openrouter/auto', priority ?? 0]
+  );
+  res.json({ success: true, id });
+});
+
+app.put('/api/admin/ai-keys/:id', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const existing = await dbGet('SELECT * FROM ai_api_keys WHERE id = ?', [req.params.id]);
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  const { api_key, model, priority, enabled } = req.body;
+  await dbRun(
+    'UPDATE ai_api_keys SET api_key = ?, model = ?, priority = ?, enabled = ? WHERE id = ?',
+    [
+      api_key !== undefined ? api_key : existing.api_key,
+      model !== undefined ? model : existing.model,
+      priority !== undefined ? priority : existing.priority,
+      enabled !== undefined ? (enabled ? 1 : 0) : existing.enabled,
+      req.params.id
+    ]
+  );
+  res.json({ success: true });
+});
+
+app.delete('/api/admin/ai-keys/:id', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  await dbRun('DELETE FROM ai_api_keys WHERE id = ?', [req.params.id]);
+  res.json({ success: true });
 });
 
 // Update Profile/Progress Endpoint

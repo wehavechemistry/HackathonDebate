@@ -112,3 +112,11 @@ export interface Announcement {
   content_vi: string;
   createdAt: string;
 }
+
+export interface AiApiKey {
+  id: string;
+  api_key: string;
+  model: string;
+  priority: number;
+  enabled: boolean;
+}

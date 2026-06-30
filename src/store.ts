@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { User, Lesson, Topic, BotPersonality, DebateMotion, Announcement } from './types';
+import type { User, Lesson, Topic, BotPersonality, DebateMotion, Announcement, AiApiKey } from './types';
 
 interface AppState {
   theme: 'dark' | 'light';
@@ -13,10 +13,14 @@ interface AppState {
   announcements: Announcement[];
   aiConfigured: boolean;
   apiModel: string;
+  aiKeys: AiApiKey[];
   isLoading: boolean;
   
   initApp: () => Promise<void>;
-  saveAiConfig: (apiKey: string, model: string) => Promise<boolean>;
+  fetchAiKeys: () => Promise<void>;
+  addAiKey: (apiKey: string, model?: string, priority?: number) => Promise<boolean>;
+  updateAiKey: (id: string, updates: Partial<AiApiKey>) => Promise<boolean>;
+  deleteAiKey: (id: string) => Promise<boolean>;
   setTheme: (t: 'dark' | 'light') => void;
   toggleTheme: () => void;
   setLanguage: (l: 'en' | 'vi') => void;
@@ -90,12 +94,12 @@ export const useStore = create<AppState>((set, get) => ({
   announcements: [],
   aiConfigured: false,
   apiModel: 'openrouter/auto',
+  aiKeys: [],
   isLoading: true,
 
   initApp: async () => {
     try {
       set({ isLoading: true });
-      // Fetch currently logged in user
       const userRes = await fetch('/api/auth/me');
       const userData = await userRes.json();
       if (userData.user) {
@@ -111,7 +115,6 @@ export const useStore = create<AppState>((set, get) => ({
         });
       }
 
-      // Fetch dynamic content
       const contentRes = await fetch('/api/content');
       const contentData = await contentRes.json();
       if (contentData) {
@@ -366,24 +369,73 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  saveAiConfig: async (apiKey, model) => {
+  fetchAiKeys: async () => {
     try {
-      const response = await fetch('/api/admin/ai-config', {
+      const [keysRes, aiRes] = await Promise.all([
+        fetch('/api/admin/ai-keys'),
+        fetch('/api/ai/config'),
+      ]);
+      if (keysRes.ok) {
+        const data = await keysRes.json();
+        set({ aiKeys: data.keys || [] });
+      }
+      if (aiRes.ok) {
+        const aiData = await aiRes.json();
+        set({
+          aiConfigured: !!aiData.configured,
+          apiModel: aiData.model || 'openrouter/auto',
+        });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  },
+
+  addAiKey: async (apiKey, model, priority) => {
+    try {
+      const res = await fetch('/api/admin/ai-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey, model: model || 'openrouter/auto', priority: priority ?? 0 }),
+      });
+      if (res.ok) {
+        await get().fetchAiKeys();
+        return true;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
+  },
+
+  updateAiKey: async (id, updates) => {
+    try {
+      const res = await fetch(`/api/admin/ai-keys/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, apiModel: model }),
+        body: JSON.stringify(updates),
       });
-      if (!response.ok) return false;
-      const data = await response.json();
-      set({
-        aiConfigured: !!data.configured,
-        apiModel: data.model || 'openrouter/auto',
-      });
-      return true;
+      if (res.ok) {
+        await get().fetchAiKeys();
+        return true;
+      }
     } catch (e) {
-      console.error('Failed to save AI config', e);
-      return false;
+      console.error(e);
     }
+    return false;
+  },
+
+  deleteAiKey: async (id) => {
+    try {
+      const res = await fetch(`/api/admin/ai-keys/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        await get().fetchAiKeys();
+        return true;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
   },
 
   banUser: async (userId) => {
