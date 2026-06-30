@@ -39,8 +39,7 @@ export default function Training() {
   const categories = ['random', 'education', 'technology', 'environment', 'economics', 'politics', 'society', 'media', 'culture'];
   const debateLang = language;
 
-  // Modes that don't require an AI-generated reference text before the user types -
-  // they only need a motion (and possibly a side) selected.
+  // Modes that don't require an AI-generated reference text before the user types
   const motionOnlyModes: Mode[] = ['keyword', 'speech', 'case', 'framing'];
 
   const randomizeMotion = () => {
@@ -133,10 +132,11 @@ export default function Training() {
     if (!userInput.trim()) return;
     setIsLoading(true);
     const motionText = selectedMotion ? (debateLang === 'vi' ? selectedMotion.motion_vi : selectedMotion.motion_en) : '';
+    const sideLabel = side === 'for' ? t('battle.for', language) : t('battle.against', language);
     const prompt = buildSpeechPracticePrompt(debateLang);
     const result = await callOpenRouter([
       { role: 'system', content: prompt },
-      { role: 'user', content: `Motion: ${motionText}\n\nUser's speech:\n${userInput}` },
+      { role: 'user', content: `Motion: "${motionText}"\nSide: ${sideLabel}\n\nUser's speech:\n${userInput}` },
     ]);
     setFeedback(result);
     setStep('feedback');
@@ -214,23 +214,24 @@ export default function Training() {
     const prompt = buildCaseBuildingPrompt(debateLang);
     const result = await callOpenRouter([
       { role: 'system', content: prompt },
-      { role: 'user', content: `Motion: ${motionText}\nPosition: ${sideLabel}\n\nUser's case:\n${userInput}` },
+      { role: 'user', content: `Motion: "${motionText}"\nPosition: ${sideLabel}\n\nUser's case:\n${userInput}` },
     ]);
     setFeedback(result);
     setStep('feedback');
     setIsLoading(false);
     incrementTrainingStat('caseBuilding');
-    addActivity({ type: 'training', title: language === 'vi' ? 'X\u00e2y d\u1ef1ng h\u1ec7 th\u1ed1ng' : 'Case Building' });
+    addActivity({ type: 'training', title: language === 'vi' ? 'X\u00e2y d\u1ef1ng h\u1ec7 th\u1ed1ng lu\u1eadn \u0111i\u1ec3m' : 'Case Building' });
   };
 
   const submitFraming = async () => {
     if (!userInput.trim()) return;
     setIsLoading(true);
     const motionText = selectedMotion ? (debateLang === 'vi' ? selectedMotion.motion_vi : selectedMotion.motion_en) : '';
+    const sideLabel = side === 'for' ? t('battle.for', language) : t('battle.against', language);
     const prompt = buildFramingPracticePrompt(debateLang);
     const result = await callOpenRouter([
       { role: 'system', content: prompt },
-      { role: 'user', content: `Motion: ${motionText}\n\nUser's framing:\n${userInput}` },
+      { role: 'user', content: `Motion: "${motionText}"\nSide: ${sideLabel}\n\nUser's framing:\n${userInput}` },
     ]);
     setFeedback(result);
     setStep('feedback');
@@ -297,13 +298,12 @@ export default function Training() {
     : mode === 'case' ? t('training.case', language)
     : t('training.framing', language);
 
-  // Modes that show an AI-generated reference text the user reacts to.
   const showsGeneratedArg = generatedArg && (mode === 'rebuttal' || mode === 'poi' || mode === 'fallacy' || mode === 'weighing');
   const generatedArgLabel = mode === 'fallacy'
     ? (language === 'vi' ? 'Lu\u1eadn \u0111i\u1ec3m c\u1ea7n soi l\u1ed7i:' : 'Argument to inspect:')
     : mode === 'weighing'
     ? (language === 'vi' ? 'Hai lu\u1eadn \u0111i\u1ec3m \u0111\u1ed1i l\u1eadp:' : 'Competing arguments:')
-    : (language === 'vi' ? 'Lu\u1eadn \u0111i\u1ec3m \u0111\u1ed1i th\u1ee7:' : 'Opponent\'s argument:');
+    : (language === 'vi' ? 'Lu\u1eadn \u0111i\u1ec3m c\u1ee7a \u0111\u1ed1i th\u1ee7:' : 'Opponent\'s argument:');
 
   const inputLabel = mode === 'keyword'
     ? (language === 'vi' ? 'Nh\u1eadp 5 t\u1eeb kh\u00f3a (c\u00e1ch nhau b\u1eb1ng d\u1ea5u ph\u1ea9y):' : 'Enter 5 keywords (comma separated):')
@@ -364,7 +364,7 @@ export default function Training() {
             </div>
           </div>
 
-          {mode === 'case' && (
+          {(mode === 'case' || mode === 'speech' || mode === 'framing') && (
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-2">{t('battle.side', language)}</label>
               <div className="flex gap-2">
@@ -407,7 +407,7 @@ export default function Training() {
             <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-700/50">
               <p className="text-xs text-slate-400 mb-1">{t('battle.motion', language)}</p>
               <p className="text-white font-medium">{debateLang === 'vi' ? selectedMotion.motion_vi : selectedMotion.motion_en}</p>
-              {mode === 'case' && (
+              {(mode === 'case' || mode === 'speech' || mode === 'framing') && (
                 <p className="text-xs text-orange-400 mt-2">{t('battle.side', language)}: {side === 'for' ? t('battle.for', language) : t('battle.against', language)}</p>
               )}
             </div>
@@ -422,8 +422,11 @@ export default function Training() {
           )}
 
           {isLoading ? (
-            <div className="flex justify-center py-8">
+            <div className="flex flex-col items-center justify-center py-8 space-y-3">
               <CoachCrab size={50} />
+              <p className="text-sm text-slate-400 animate-pulse">
+                {language === 'vi' ? 'AI \u0111ang t\u1ea1o lu\u1eadn \u0111i\u1ec3m...' : 'AI is generating argument...'}
+              </p>
             </div>
           ) : (
             <>

@@ -48,13 +48,13 @@ function parseJudgment(text: string): ParsedJudgment {
   if (!text) return result;
 
   // 1. Winner
-  const winnerMatch = text.match(/(?:Winner|ChiĂĄĹĹźn thĂĄĹĹťng|NgÄÂ°ĂĄĹĽÂi thĂĄĹĹťng|Winner is|Winner:)\s*:\s*\**([^*#\r\n\t|]+)\**/i);
+  const winnerMatch = text.match(/(?:Winner|Chiến thắng|Người thắng|Winner is|Winner:)\s*:\s*\**([^*#\r\n\t|]+)\**/i);
   if (winnerMatch) {
     result.winner = winnerMatch[1].trim();
   } else {
     const lines = text.split('\n');
     for (const line of lines) {
-      if (line.toLowerCase().includes('winner:') || line.toLowerCase().includes('chiĂĄĹĹźn thĂĄĹĹťng:')) {
+      if (line.toLowerCase().includes('winner:') || line.toLowerCase().includes('chiến thắng:')) {
         const parts = line.split(':');
         if (parts.length > 1) {
           result.winner = parts[1].replace(/\*\*/g, '').replace(/#/g, '').trim();
@@ -84,7 +84,7 @@ function parseJudgment(text: string): ParsedJudgment {
         const user = parts[1];
         const opponent = parts[2];
         
-        const isHeader = criteria.toLowerCase().includes('criteria') || criteria.toLowerCase().includes('tiÄĹu chÄÂ­') || criteria.toLowerCase().includes('hĂĄĹÄng mĂĄĹĽÄ˝c');
+        const isHeader = criteria.toLowerCase().includes('criteria') || criteria.toLowerCase().includes('tiêu chí') || criteria.toLowerCase().includes('hạng mục');
         const isDivider = criteria.includes('---') || user.includes('---');
         
         if (isHeader || isDivider) {
@@ -106,12 +106,12 @@ function parseJudgment(text: string): ParsedJudgment {
   result.scores = tableRows;
 
   // 3. Analysis & Feedback
-  const analysisMatch = text.match(/(?:###?\s*(?:Analysis|PhÄËn tÄÂ­ch|ĂÂÄÄnh giÄÄ|NhĂĄĹÂ­n xÄĹ t|NĂĄĹĽÂi dung phÄËn tÄÂ­ch|Turning Points)\s*[\r\n]+)([\s\S]*?)(?=###?|$)/i);
+  const analysisMatch = text.match(/(?:###?\s*(?:Analysis|Phân tích|Đánh giá|Nhận xét|Nội dung phân tích|Turning Points)\s*[\r\n]+)([\s\S]*?)(?=###?|$)/i);
   if (analysisMatch) {
     result.analysis = analysisMatch[1].trim();
   }
 
-  const feedbackMatch = text.match(/(?:###?\s*(?:Feedback for User|PhĂĄĹĹn hĂĄĹĽÂi|GĂĄĹĽĹi ÄË|Feedback|Constructive Feedback|LĂĄĹĽÂi khuyÄĹn|GĂĄĹĽĹi ÄË cho ngÄÂ°ĂĄĹĽÂi dÄĹĄng)\s*[\r\n]+)([\s\S]*?)(?=###?|$)/i);
+  const feedbackMatch = text.match(/(?:###?\s*(?:Feedback for User|Phản hồi|Góp ý|Feedback|Constructive Feedback|Lời khuyên|Góp ý cho người dùng)\s*[\r\n]+)([\s\S]*?)(?=###?|$)/i);
   if (feedbackMatch) {
     result.feedback = feedbackMatch[1].trim();
   }
@@ -120,9 +120,9 @@ function parseJudgment(text: string): ParsedJudgment {
     const parts = text.split(/###?\s+/);
     for (const part of parts) {
       const pLower = part.toLowerCase();
-      if (pLower.startsWith('analysis') || pLower.startsWith('phÄËn tÄÂ­ch')) {
+      if (pLower.startsWith('analysis') || pLower.startsWith('phân tích')) {
         result.analysis = part.substring(part.indexOf('\n')).trim();
-      } else if (pLower.startsWith('feedback') || pLower.startsWith('gĂĄĹĽĹi ÄË') || pLower.startsWith('phĂĄĹĹn hĂĄĹĽÂi')) {
+      } else if (pLower.startsWith('feedback') || pLower.startsWith('góp ý') || pLower.startsWith('phản hồi')) {
         result.feedback = part.substring(part.indexOf('\n')).trim();
       }
     }
@@ -151,16 +151,16 @@ function JudgmentScorecard({ judgmentText, language, onNewBattle }: JudgmentScor
             onClick={onNewBattle}
             className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-all shadow-lg shadow-orange-500/20"
           >
-            {language === 'vi' ? 'TrĂĄĹÂ­n ĂÂĂĄĹÄ˝u mĂĄĹĽÂi' : 'New Battle'}
+            {language === 'vi' ? 'Trận đấu mới' : 'New Battle'}
           </button>
         </div>
       </div>
     );
   }
 
-  const totalRow = parsed.scores.find(s => s.criteria.toLowerCase().includes('total') || s.criteria.toLowerCase().includes('tĂĄĹĽÂng'));
-  const criteriaRows = parsed.scores.filter(s => !(s.criteria.toLowerCase().includes('total') || s.criteria.toLowerCase().includes('tĂĄĹĽÂng')));
-  const userWon = parsed.winner.toLowerCase().includes('user') || parsed.winner.toLowerCase().includes('ngÄÂ°ĂĄĹĽÂi dÄĹĄng') || 
+  const totalRow = parsed.scores.find(s => s.criteria.toLowerCase().includes('total') || s.criteria.toLowerCase().includes('tổng'));
+  const criteriaRows = parsed.scores.filter(s => !(s.criteria.toLowerCase().includes('total') || s.criteria.toLowerCase().includes('tổng')));
+  const userWon = parsed.winner.toLowerCase().includes('user') || parsed.winner.toLowerCase().includes('người dùng') || 
                   (totalRow && totalRow.user > totalRow.opponent);
 
   return (
@@ -179,10 +179,10 @@ function JudgmentScorecard({ judgmentText, language, onNewBattle }: JudgmentScor
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
-                {language === 'vi' ? 'KĂĄĹĹźt quĂĄĹĹ chung cuĂĄĹĽÂc' : 'Final Result'}
+                {language === 'vi' ? 'Kết quả chung cuộc' : 'Final Result'}
               </p>
               <h2 className="text-xl font-black text-white mt-0.5">
-                {language === 'vi' ? 'NgÄÂ°ĂĄĹĽÂi thĂĄĹĹťng: ' : 'Winner: '}
+                {language === 'vi' ? 'Người thắng: ' : 'Winner: '}
                 <span className={userWon ? 'text-emerald-400' : 'text-orange-400'}>
                   {parsed.winner || (userWon ? 'User' : 'AI Opponent')}
                 </span>
@@ -193,7 +193,7 @@ function JudgmentScorecard({ judgmentText, language, onNewBattle }: JudgmentScor
           {totalRow && (
             <div className="flex items-center gap-4 bg-slate-950/80 px-5 py-3 rounded-xl border border-slate-800/80">
               <div className="text-center">
-                <span className="text-[10px] text-slate-500 block uppercase font-bold">{language === 'vi' ? 'BĂĄĹÄn' : 'You'}</span>
+                <span className="text-[10px] text-slate-500 block uppercase font-bold">{language === 'vi' ? 'Bạn' : 'You'}</span>
                 <span className="text-xl font-extrabold text-orange-400">{totalRow.user}</span>
                 <span className="text-xs text-slate-500">/{totalRow.maxScore}</span>
               </div>
@@ -210,7 +210,7 @@ function JudgmentScorecard({ judgmentText, language, onNewBattle }: JudgmentScor
 
       <div>
         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-          {language === 'vi' ? 'Chi tiĂĄĹĹźt ĂÂiĂĄĹĽÂm sĂĄĹĽÂ' : 'Detailed Score breakdown'}
+          {language === 'vi' ? 'Chi tiết điểm số' : 'Detailed Score breakdown'}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {criteriaRows.map((row, idx) => {
@@ -232,7 +232,7 @@ function JudgmentScorecard({ judgmentText, language, onNewBattle }: JudgmentScor
                 <div className="space-y-2.5">
                   <div>
                     <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-                      <span>{language === 'vi' ? 'BĂĄĹÄn' : 'You'}</span>
+                      <span>{language === 'vi' ? 'Bạn' : 'You'}</span>
                       <span className="font-bold">{row.user}/{row.maxScore}</span>
                     </div>
                     <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800/50">
@@ -267,7 +267,7 @@ function JudgmentScorecard({ judgmentText, language, onNewBattle }: JudgmentScor
           <div className="flex items-center gap-2 mb-3 border-b border-slate-800/80 pb-2">
             <Activity className="w-4 h-4 text-orange-400" />
             <h3 className="font-bold text-white text-sm uppercase tracking-wider">
-              {language === 'vi' ? 'PhÄËn tÄÂ­ch diĂĄĹĽÂn biĂĄĹĹźn' : 'Debate Analysis'}
+              {language === 'vi' ? 'Phân tích diễn biến' : 'Debate Analysis'}
             </h3>
           </div>
           <MarkdownRenderer content={parsed.analysis} className="text-sm prose-slate" />
@@ -279,7 +279,7 @@ function JudgmentScorecard({ judgmentText, language, onNewBattle }: JudgmentScor
           <div className="flex items-center gap-2 mb-3 border-b border-slate-800/80 pb-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             <h3 className="font-bold text-white text-sm uppercase tracking-wider">
-              {language === 'vi' ? 'NhĂĄĹÂ­n xÄĹ t & LĂĄĹĽÂi khuyÄĹn' : 'Constructive Feedback'}
+              {language === 'vi' ? 'Nhận xét & Lời khuyên' : 'Constructive Feedback'}
             </h3>
           </div>
           <MarkdownRenderer content={parsed.feedback} className="text-sm prose-slate" />
@@ -291,7 +291,7 @@ function JudgmentScorecard({ judgmentText, language, onNewBattle }: JudgmentScor
           onClick={onNewBattle}
           className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-all shadow-lg shadow-orange-500/25 hover:scale-[1.01]"
         >
-          {language === 'vi' ? 'TrĂĄĹÂ­n ĂÂĂĄĹÄ˝u mĂĄĹĽÂi' : 'New Battle'}
+          {language === 'vi' ? 'Trận đấu mới' : 'New Battle'}
         </button>
       </div>
     </div>
@@ -540,15 +540,24 @@ export default function Battle() {
     setIsLoading(true);
     setTimerRunning(false);
 
-    const judgePrompt = buildJudgePrompt(debateLang);
     const motionText = debateLang === 'vi' ? motion_.motion_vi : motion_.motion_en;
+    const aiSide: 'for' | 'against' = side === 'for' ? 'against' : 'for';
+    const userSideLabel = t(side === 'for' ? 'battle.for' : 'battle.against', debateLang);
+    const aiSideLabel = t(aiSide === 'for' ? 'battle.for' : 'battle.against', debateLang);
+    const userName = currentUser?.username || (debateLang === 'vi' ? 'Người dùng' : 'User');
+    const opponentName = isCustomEngine ? 'Engine' : (selectedBot?.name || 'AI');
+
+    const judgePrompt = buildJudgePrompt(debateLang, motionText, userSideLabel, aiSideLabel, userName, opponentName);
+
     const debateLog = messages.filter(m => m.role !== 'system').map(m =>
-      `[${m.role === 'user' ? 'User' : 'AI'}]: ${m.content}`
+      m.role === 'user'
+        ? `[${userName} (${userSideLabel})]: ${m.content}`
+        : `[${opponentName} (${aiSideLabel})]: ${m.content}`
     ).join('\n\n');
 
     const result = await callOpenRouter([
       { role: 'system', content: judgePrompt },
-      { role: 'user', content: `Motion: "${motionText}"\nUser side: ${side}\n\n--- Debate Transcript ---\n${debateLog}\n\n--- End ---\n\nJudge this debate.` },
+      { role: 'user', content: `--- Debate Transcript ---\n${debateLog}\n\n--- End ---\n\nJudge this debate now.` },
     ]);
 
     setJudgment(result);
@@ -556,8 +565,7 @@ export default function Battle() {
     setPhase('finished');
 
     incrementTrainingStat('debates');
-    const botName = isCustomEngine ? 'Engine' : (selectedBot?.name || 'AI');
-    addActivity({ type: 'battle', title: `${language === 'vi' ? 'Tr\u1eadn \u0111\u1ea5u v\u1edbi' : 'Battle vs'} ${botName}`, detail: motionText.slice(0, 50) });
+    addActivity({ type: 'battle', title: `${language === 'vi' ? 'Trận đấu với' : 'Battle vs'} ${opponentName}`, detail: motionText.slice(0, 50) });
 
     // Determine stars
     if (!isCustomEngine && selectedBot) {
@@ -789,7 +797,7 @@ export default function Battle() {
 
           {!aiConfigured && (
             <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-400 text-sm">
-              {language === 'vi' ? 'AI ch b   11 c quy bt cho admin. Li ean h ec admin  11 ec  11 bi c e0u h ecnh.' : 'AI access is controlled by admin. Please ask an admin to configure AI for the system.'}
+              {language === 'vi' ? 'AI chỉ được quản lý bởi admin. Liên hệ admin để cấu hình.' : 'AI access is controlled by admin. Please ask an admin to configure AI for the system.'}
             </div>
           )}
 
@@ -820,7 +828,7 @@ export default function Battle() {
           <button 
             onClick={() => setPhase('setup')} 
             className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-all shrink-0"
-            title={language === 'vi' ? 'Quay láşĄi thiáşżt láş­p' : 'Back to setup'}
+            title={language === 'vi' ? 'Quay lại thiết lập' : 'Back to setup'}
           >
             <ChevronLeft size={20} />
           </button>
@@ -849,7 +857,7 @@ export default function Battle() {
           </span>
           <div className="h-4 w-px bg-slate-200 dark:bg-slate-800" />
           <span className="text-slate-500 dark:text-slate-400 font-semibold bg-slate-100 dark:bg-slate-800/60 px-2 py-1 rounded-md">
-            {language === 'vi' ? `LĆ°áťŁt ${round}` : `Round ${round}`}
+            {language === 'vi' ? `Lượt ${round}` : `Round ${round}`}
           </span>
           {phase === 'debate' && (
             <>
@@ -866,7 +874,7 @@ export default function Battle() {
         </div>
       </div>
 
-      {/* Main Workspace Workspace layout with no outer scrollbars */}
+      {/* Main Workspace layout with no outer scrollbars */}
       <div className="flex-1 flex gap-5 min-h-0 overflow-hidden">
         {/* Notes sidebar */}
         <div className="hidden md:flex flex-col w-64 shrink-0 min-h-0">
@@ -879,7 +887,7 @@ export default function Battle() {
               value={notes}
               onChange={e => setNotes(e.target.value)}
               className="flex-1 bg-transparent text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 resize-none focus:outline-none scrollbar-thin"
-              placeholder={language === 'vi' ? 'Ghi chĂş luáş­n Äiáťm tranh biáťn cáť§a báşĄn táşĄi ÄĂ˘y...' : 'Jot down your debate points or arguments here...'}
+              placeholder={language === 'vi' ? 'Ghi chú luận điểm tranh biện của bạn tại đây...' : 'Jot down your debate points or arguments here...'}
             />
           </div>
         </div>
@@ -901,10 +909,10 @@ export default function Battle() {
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                    {language === 'vi' ? 'Äang cháşĽm Äiáťm tráş­n ÄáşĽu...' : 'Judging the debate...'}
+                    {language === 'vi' ? 'Đang chấm điểm trận đấu...' : 'Judging the debate...'}
                   </h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm">
-                    {language === 'vi' ? 'Tráťng tĂ i Crab Äang xem xĂŠt káťš lĆ°áťĄng cĂĄc luáş­n Äiáťm cáť§a cáşŁ hai bĂŞn.' : 'Judge Crab is carefully reviewing and scoring arguments from both sides.'}
+                    {language === 'vi' ? 'Trọng tài Crab đang xem xét kỹ lưỡng các luận điểm của cả hai bên.' : 'Judge Crab is carefully reviewing and scoring arguments from both sides.'}
                   </p>
                 </div>
               </div>
@@ -916,7 +924,7 @@ export default function Battle() {
                       <CoachCrab size={54} animate={false} />
                     </div>
                     <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                      {language === 'vi' ? 'Tráş­n ÄáşĽu báşŻt Äáş§u! HĂŁy trĂŹnh bĂ y bĂ i phĂĄt biáťu cáť§a báşĄn.' : 'Debate started! Present your opening speech.'}
+                      {language === 'vi' ? 'Trận đấu bắt đầu! Hãy trình bày bài phát biểu của bạn.' : 'Debate started! Present your opening speech.'}
                     </p>
                   </div>
                 )}
@@ -969,7 +977,7 @@ export default function Battle() {
                         {getBotAvatar(isCustomEngine ? 'engine' : (selectedBot?.avatar || 'engine'), 20)}
                       </div>
                       <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/40 px-3 py-2 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
-                        <span className="text-xs mr-1">{language === 'vi' ? 'AI Äang láş­p luáş­n' : 'AI is thinking'}</span>
+                        <span className="text-xs mr-1">{language === 'vi' ? 'AI đang lập luận' : 'AI is thinking'}</span>
                         {[0, 1, 2].map(i => (
                           <motion.div 
                             key={i} 
@@ -1004,8 +1012,8 @@ export default function Battle() {
                   value={inputText}
                   onChange={e => setInputText(e.target.value)}
                   placeholder={currentTurn === 'user'
-                    ? (language === 'vi' ? 'Nháş­p phĂĄt biáťu cáť§a báşĄn táşĄi ÄĂ˘y...' : 'Type your speech here...')
-                    : (language === 'vi' ? 'Äang cháť bĂ i nĂłi cáť§a Äáťi tháť§ AI...' : 'Waiting for AI opponent to speak...')}
+                    ? (language === 'vi' ? 'Nhập phát biểu của bạn tại đây...' : 'Type your speech here...')
+                    : (language === 'vi' ? 'Đang chờ bài nói của đối thủ AI...' : 'Waiting for AI opponent to speak...')}
                   disabled={currentTurn !== 'user' || isLoading}
                   className="flex-1 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-white text-sm placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50 resize-none disabled:opacity-50"
                   rows={3}
@@ -1057,7 +1065,7 @@ export default function Battle() {
               <div className="flex justify-between items-center px-1">
                 <p className="text-xs text-slate-400 dark:text-slate-500">
                   {language === 'vi' 
-                    ? `ÄĂŁ dĂšng ${hintsUsed} gáťŁi Ă˝ | NháşĽn Ctrl+Enter Äáť gáť­i` 
+                    ? `Đã dùng ${hintsUsed} gợi ý | Nhấn Ctrl+Enter để gửi` 
                     : `Hints used: ${hintsUsed} | Ctrl+Enter to send`}
                 </p>
                 <button

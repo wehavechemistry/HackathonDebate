@@ -21,6 +21,7 @@ interface AppState {
   addAiKey: (apiKey: string, model?: string, priority?: number) => Promise<boolean>;
   updateAiKey: (id: string, updates: Partial<AiApiKey>) => Promise<boolean>;
   deleteAiKey: (id: string) => Promise<boolean>;
+  saveAiConfig: (apiKey: string, model: string) => Promise<boolean>;
   setTheme: (t: 'dark' | 'light') => void;
   toggleTheme: () => void;
   setLanguage: (l: 'en' | 'vi') => void;
@@ -436,6 +437,30 @@ export const useStore = create<AppState>((set, get) => ({
       console.error(e);
     }
     return false;
+  },
+
+  saveAiConfig: async (apiKey: string, model: string) => {
+    try {
+      const state = get();
+      // Add key if none exist, otherwise update the first key
+      if (state.aiKeys.length === 0) {
+        const ok = await state.addAiKey(apiKey, model, 0);
+        if (ok) {
+          set({ apiModel: model, aiConfigured: true });
+        }
+        return ok;
+      } else {
+        const firstKey = state.aiKeys[0];
+        const ok = await state.updateAiKey(firstKey.id, { api_key: apiKey, model });
+        if (ok) {
+          set({ apiModel: model, aiConfigured: true });
+        }
+        return ok;
+      }
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
   },
 
   banUser: async (userId) => {

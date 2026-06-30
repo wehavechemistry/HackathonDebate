@@ -45,7 +45,7 @@ export function buildDebateSystemPrompt(
 ): string {
   const aiSide = side === 'for' ? 'against' : 'for';
   const aiSideLabel = language === 'vi'
-    ? (aiSide === 'for' ? 'Ung ho (Chinh phu)' : 'Phan doi (Doi lap)')
+    ? (aiSide === 'for' ? 'Ủng hộ (Chính phủ)' : 'Phản đối (Đối lập)')
     : (aiSide === 'for' ? 'Government (For)' : 'Opposition (Against)');
 
   const langInstruction = language === 'vi'
@@ -122,12 +122,27 @@ RULES:
 - Personality affects HOW you argue. Skill profile affects HOW WELL you argue.`;
 }
 
-export function buildJudgePrompt(language: string): string {
+export function buildJudgePrompt(
+  language: string,
+  motion: string,
+  userSideLabel: string,
+  aiSideLabel: string,
+  userName: string,
+  opponentName: string,
+): string {
   const lang = language === 'vi'
     ? `You are a professional debate judge. Respond entirely in Vietnamese with proper diacritics.`
     : `You are a professional debate judge. Respond entirely in English.`;
 
   return `${lang}
+
+You are judging a practice debate. Read this context carefully before judging:
+
+Motion: "${motion}"
+- ${userName} argued the side: ${userSideLabel}
+- ${opponentName} argued the side: ${aiSideLabel}
+
+The transcript below labels every message with the speaker's name and side in brackets, e.g. "[${userName} (${userSideLabel})]:" or "[${opponentName} (${aiSideLabel})]:". Read these labels carefully before judging - do NOT mix up who argued which side, and do NOT assume a default winner. Judge strictly based on the actual arguments each side presented in the transcript, not on which side is usually stronger in general.
 
 Evaluate the debate based on these criteria with suggested weights:
 - Argumentation (40-50%): Quality, depth, and structure of arguments
@@ -135,7 +150,8 @@ Evaluate the debate based on these criteria with suggested weights:
 - Rebuttal (20-30%): How well each side addressed opponent's arguments
 - Delivery (10-20%): Clarity, coherence, persuasiveness
 
-Provide your judgment in this format:
+IMPORTANT: Always use the EXACT section headers below in English, even when writing the content itself in Vietnamese. In the format, "User" refers to ${userName} and "AI Opponent" refers to ${opponentName}:
+
 ## Winner: [User/AI Opponent]
 
 ### Score Breakdown
@@ -148,10 +164,10 @@ Provide your judgment in this format:
 | **Total** | **X/40** | **X/40** |
 
 ### Analysis
-[Brief analysis of key moments and turning points]
+[Brief analysis of key moments and turning points, referencing which side made which points]
 
 ### Feedback for User
-[Constructive feedback - what to improve]`;
+[Constructive feedback for ${userName} - what to improve]`;
 }
 
 export function buildHintPrompt(language: string): string {
