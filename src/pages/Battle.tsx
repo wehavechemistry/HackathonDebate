@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shuffle, Play, Send, Lightbulb, Star, Clock, ChevronLeft, Trophy, Activity, CheckCircle2 } from 'lucide-react';
+import { Shuffle, Play, Send, Lightbulb, Star, Clock, ChevronLeft, Trophy, Activity, CheckCircle2, Mic, MicOff } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import { callOpenRouter, buildDebateSystemPrompt, buildJudgePrompt, buildHintPrompt } from '../api';
@@ -321,11 +321,15 @@ export default function Battle() {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [round, setRound] = useState(1);
   const [hintsUsed, setHintsUsed] = useState(0);
+  const [isListening, setIsListening] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
   const [judgment, setJudgment] = useState('');
   const [currentTurn, setCurrentTurn] = useState<'user' | 'ai'>('user');
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const interimRef = useRef('');
 
   const categories = ['random', ...Array.from(new Set(motions.map(m => m.category))).sort()];
 
@@ -374,7 +378,70 @@ export default function Battle() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [timerRunning, timeRemaining]);
 
+  useEffect(() => {
+    return () => recognitionRef.current?.abort();
+  }, []);
+
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+
+  const localeMap: Record<string, string> = { en: 'en-US', vi: 'vi-VN' };
+
+  const toggleListening = () => {
+    if (currentTurn !== 'user' || isLoading) return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert(debateLang === 'vi' ? 'Trình duyệt không hỗ trợ nhận dạng giọng nói.' : 'Speech recognition is not supported in this browser.');
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      const recognition = new SpeechRecognition();
+      recognition.lang = localeMap[debateLang] || 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      let finalText = '';
+      interimRef.current = '';
+      recognition.onresult = (event: any) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const r = event.results[i];
+          if (r.isFinal) {
+            finalText += (finalText ? ' ' : '') + r[0].transcript;
+            interimRef.current = '';
+            setInterimTranscript('');
+          } else {
+            interimRef.current = r[0].transcript;
+            setInterimTranscript(r[0].transcript);
+          }
+        }
+      };
+      recognition.onend = () => {
+        setIsListening(false);
+        const text = (finalText || interimRef.current).trim();
+        if (text && currentTurn === 'user' && !isLoading) {
+          setInputText(text);
+          submitSpeech(text);
+        }
+        interimRef.current = '';
+        setInterimTranscript('');
+        finalText = '';
+      };
+      recognition.onerror = (e: any) => {
+        setIsListening(false);
+        interimRef.current = '';
+        setInterimTranscript('');
+        if (e?.error) {
+          const msg = debateLang === 'vi'
+            ? `Lỗi ghi âm: ${e.error}`
+            : `Recording error: ${e.error}`;
+          alert(msg);
+        }
+      };
+      recognitionRef.current = recognition;
+      recognition.start();
+      setIsListening(true);
+    }
+  };
 
   const startDebate = async () => {
     if (!motion_) return;
@@ -412,9 +479,10 @@ export default function Battle() {
     }
   };
 
-  const submitSpeech = async () => {
-    if (!inputText.trim() || !motion_) return;
-    const userMsg: ChatMessage = { role: 'user', content: inputText.trim(), timestamp: new Date().toISOString() };
+  const submitSpeech = async (directContent?: string) => {
+    const content = (directContent ?? inputText).trim();
+    if (!content || !motion_) return;
+    const userMsg: ChatMessage = { role: 'user', content, timestamp: new Date().toISOString() };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInputText('');
@@ -945,12 +1013,24 @@ export default function Battle() {
                 />
                 <div className="flex flex-col gap-1.5">
                   <button
-                    onClick={submitSpeech}
+                    onClick={() => submitSpeech()}
                     disabled={!inputText.trim() || currentTurn !== 'user' || isLoading}
                     className="flex-1 px-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-all disabled:opacity-50 shadow-sm hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center"
                     title={t('battle.submit', language)}
                   >
                     <Send size={16} />
+                  </button>
+                  <button
+                    onClick={toggleListening}
+                    disabled={currentTurn !== 'user' || isLoading}
+                    className={`p-3 rounded-xl transition-all flex items-center justify-center ${
+                      isListening
+                        ? 'bg-red-500 hover:bg-red-600 text-white border border-red-500 animate-pulse'
+                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
+                    }`}
+                    title={isListening ? (language === 'vi' ? 'Dừng thu âm' : 'Stop recording') : (language === 'vi' ? 'Thu âm giọng nói' : 'Voice input')}
+                  >
+                    {isListening ? <MicOff size={16} /> : <Mic size={16} />}
                   </button>
                   <button
                     onClick={requestHint}
@@ -962,6 +1042,17 @@ export default function Battle() {
                   </button>
                 </div>
               </div>
+
+              {isListening && (
+                <div className="text-xs text-orange-400 italic px-3 py-2 bg-orange-500/5 rounded-lg flex items-center gap-2">
+                  <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse inline-block shrink-0" />
+                  {interimTranscript ? (
+                    <span><span className="font-semibold not-italic">{language === 'vi' ? 'Đang nghe: ' : 'Listening: '}</span>{interimTranscript}</span>
+                  ) : (
+                    <span>{language === 'vi' ? 'Đang thu âm...' : 'Recording...'}</span>
+                  )}
+                </div>
+              )}
 
               <div className="flex justify-between items-center px-1">
                 <p className="text-xs text-slate-400 dark:text-slate-500">
