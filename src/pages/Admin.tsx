@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BookOpen, Users, Bot, FileText, Megaphone, Plus, Trash2, Edit3, Shield, Ban, Pin, Save, X } from 'lucide-react';
+import { BookOpen, Users, Bot, FileText, Megaphone, Plus, Trash2, Edit3, Shield, Ban, Pin, Save, X, Key, CheckCircle, XCircle, ArrowUpDown } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import CoachCrab from '../components/CoachCrab';
 import type { Lesson, Topic, BotPersonality, Announcement } from '../types';
 
-type Tab = 'lessons' | 'users' | 'bots' | 'topics' | 'announcements' | 'create_admin';
+type Tab = 'lessons' | 'users' | 'bots' | 'topics' | 'announcements' | 'ai_keys' | 'create_admin';
 
 export default function Admin() {
   const store = useStore();
@@ -27,6 +27,7 @@ export default function Admin() {
     { key: 'bots', label: t('admin.bots', language), icon: Bot },
     { key: 'topics', label: t('admin.topics', language), icon: FileText },
     { key: 'announcements', label: t('admin.announcements', language), icon: Megaphone },
+    { key: 'ai_keys', label: t('admin.ai_keys', language), icon: Key },
     { key: 'create_admin', label: t('admin.create_admin', language), icon: Shield, headOnly: true },
   ];
 
@@ -60,6 +61,7 @@ export default function Admin() {
         {tab === 'bots' && <BotsManager />}
         {tab === 'topics' && <TopicsManager />}
         {tab === 'announcements' && <AnnouncementsManager />}
+        {tab === 'ai_keys' && <AiKeysManager />}
         {tab === 'create_admin' && isHeadAdmin && <CreateAdmin />}
       </motion.div>
     </div>
@@ -483,6 +485,97 @@ function AnnouncementsManager() {
             <button onClick={() => deleteAnnouncement(a.id)} className="p-1.5 text-slate-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
               <Trash2 size={14} />
             </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AiKeysManager() {
+  const { aiKeys, language, fetchAiKeys, addAiKey, updateAiKey, deleteAiKey } = useStore();
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState<{ apiKey: string; model: string; priority: number }>({ apiKey: '', model: 'openrouter/auto', priority: 0 });
+
+  useEffect(() => {
+    fetchAiKeys();
+  }, [fetchAiKeys]);
+
+  const save = async () => {
+    if (!form.apiKey) return;
+    await addAiKey(form.apiKey, form.model, form.priority);
+    setCreating(false);
+    setForm({ apiKey: '', model: 'openrouter/auto', priority: 0 });
+  };
+
+  const toggleEnabled = async (key: typeof aiKeys[0]) => {
+    await updateAiKey(key.id, { enabled: !key.enabled });
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteAiKey(id);
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-white">{t('admin.ai_keys', language)} ({aiKeys.length})</h2>
+        <button onClick={() => setCreating(true)} className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-lg">
+          <Plus size={14} /> {t('admin.add_key', language)}
+        </button>
+      </div>
+
+      {creating && (
+        <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-5 mb-6 space-y-3">
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">{t('admin.key_api_key', language)}</label>
+            <input type="text" value={form.apiKey} onChange={e => setForm({ ...form, apiKey: e.target.value })}
+              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono" placeholder="sk-or-v1-..." />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">{t('admin.key_model', language)}</label>
+            <input type="text" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })}
+              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="openrouter/auto" />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">{t('admin.key_priority', language)} (higher = tried first)</label>
+            <input type="number" value={form.priority} onChange={e => setForm({ ...form, priority: Number(e.target.value) })}
+              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={save} className="px-4 py-2 bg-orange-500 text-white text-sm rounded-lg flex items-center gap-1"><Save size={14} /> {t('admin.save_key', language)}</button>
+            <button onClick={() => setCreating(false)} className="px-4 py-2 bg-slate-700 text-white text-sm rounded-lg"><X size={14} /> {t('admin.cancel', language)}</button>
+          </div>
+        </div>
+      )}
+
+      {aiKeys.length === 0 && !creating && (
+        <div className="p-6 text-center text-slate-500 text-sm bg-slate-800/20 rounded-xl border border-slate-700/30">
+          {t('admin.no_ai_keys', language)}
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {aiKeys.sort((a, b) => b.priority - a.priority).map(k => (
+          <div key={k.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 group">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-mono truncate max-w-[200px]">{k.api_key.slice(0, 16)}...</span>
+                {k.enabled ? <CheckCircle size={12} className="text-green-400 shrink-0" /> : <XCircle size={12} className="text-red-400 shrink-0" />}
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-slate-500">{k.model}</span>
+                <span className="text-xs text-slate-600">prio: {k.priority}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => toggleEnabled(k)} className="p-1.5 text-slate-400 hover:text-green-400 transition-colors" title={k.enabled ? t('admin.disable_key', language) : t('admin.enable_key', language)}>
+                {k.enabled ? <CheckCircle size={14} /> : <XCircle size={14} />}
+              </button>
+              <button onClick={() => handleDelete(k.id)} className="p-1.5 text-slate-400 hover:text-red-400 transition-colors" title={t('admin.delete_key', language)}>
+                <Trash2 size={14} />
+              </button>
+            </div>
           </div>
         ))}
       </div>
