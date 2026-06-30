@@ -321,6 +321,7 @@ export default function Battle() {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [round, setRound] = useState(1);
   const [hintsUsed, setHintsUsed] = useState(0);
+  const MAX_HINTS = 3;
   const [isListening, setIsListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [judgment, setJudgment] = useState('');
@@ -519,7 +520,7 @@ export default function Battle() {
   };
 
   const requestHint = async () => {
-    if (!motion_) return;
+    if (!motion_ || hintsUsed >= MAX_HINTS) return;
     setIsLoading(true);
     const hintPrompt = buildHintPrompt(debateLang);
     const motionText = debateLang === 'vi' ? motion_.motion_vi : motion_.motion_en;
@@ -572,8 +573,8 @@ export default function Battle() {
       const isWin = result.toLowerCase().includes('user') && result.toLowerCase().includes('winner');
       if (isWin) {
         let stars = 3;
-        if (hintsUsed >= 1 && hintsUsed <= 3) stars = 2;
-        if (hintsUsed > 3) stars = 1;
+        if (hintsUsed >= 1 && hintsUsed <= MAX_HINTS) stars = 2;
+        if (hintsUsed > MAX_HINTS) stars = 1;
         setBotStars(selectedBot.id, stars);
       }
     }
@@ -1065,9 +1066,9 @@ export default function Battle() {
                     {t('battle.hint', language)}
                   </button>
                   <p className="text-xs text-slate-400 dark:text-slate-500">
-                    {language === 'vi' 
-                      ? `Đã dùng ${hintsUsed} gợi ý` 
-                      : `Hints used: ${hintsUsed}`}
+                    {language === 'vi'
+                      ? `Đã dùng ${hintsUsed}/${MAX_HINTS} gợi ý`
+                      : `Hints used: ${hintsUsed}/${MAX_HINTS}`}
                   </p>
                 </div>
                 <button
