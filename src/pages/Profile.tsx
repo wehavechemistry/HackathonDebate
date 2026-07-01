@@ -1,15 +1,19 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Calendar, BarChart3, BookOpen, Bookmark, FileText, Shield, Save } from 'lucide-react';
+import { User, Calendar, BarChart3, BookOpen, Bookmark, FileText, Shield, Save, Lock } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import CoachCrab from '../components/CoachCrab';
 
 export default function Profile() {
-  const { currentUser, language, updateCurrentUser, lessons } = useStore();
+  const { currentUser, language, updateCurrentUser, lessons, changePassword } = useStore();
+  const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [newUsername, setNewUsername] = useState('');
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordMsg, setPasswordMsg] = useState('');
 
   if (!currentUser) return <Navigate to="/login" />;
 
@@ -17,6 +21,18 @@ export default function Profile() {
     if (newUsername.trim().length >= 2) {
       updateCurrentUser({ username: newUsername.trim() });
       setEditing(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!oldPassword || !newPassword) return;
+    const result = await changePassword(oldPassword, newPassword);
+    if (result.success) {
+      setPasswordMsg(t('profile.password_changed', language));
+      setOldPassword('');
+      setNewPassword('');
+    } else {
+      setPasswordMsg(result.error || t('common.error', language));
     }
   };
 
@@ -145,6 +161,46 @@ export default function Profile() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Change Password */}
+        <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
+          <h2 className="font-semibold text-white flex items-center gap-2 mb-4">
+            <Lock size={18} className="text-orange-400" />
+            {t('profile.change_password', language)}
+          </h2>
+          {passwordMsg && (
+            <div className={`mb-3 p-2 rounded-lg text-sm ${passwordMsg === t('profile.password_changed', language) ? 'bg-green-500/10 border border-green-500/30 text-green-400' : 'bg-red-500/10 border border-red-500/30 text-red-400'}`}>
+              {passwordMsg}
+            </div>
+          )}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">{t('auth.old_password', language)}</label>
+              <input
+                type="password"
+                value={oldPassword}
+                onChange={e => setOldPassword(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">{t('auth.new_password', language)}</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            <button
+              onClick={handleChangePassword}
+              disabled={!oldPassword || !newPassword}
+              className="w-full py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
+            >
+              {t('auth.change_password', language)}
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { User, Lesson, Topic, BotPersonality, DebateMotion, Announcement, AiApiKey } from './types';
+import type { User, Lesson, Topic, BotPersonality, DebateMotion, Announcement, AiApiKey, Post, Reply, VoteResult } from './types';
 
 interface AppState {
   theme: 'dark' | 'light';
@@ -15,6 +15,9 @@ interface AppState {
   apiModel: string;
   aiKeys: AiApiKey[];
   isLoading: boolean;
+  posts: Post[];
+  replies: Reply[];
+  currentPostId: string | null;
   
   initApp: () => Promise<void>;
   fetchAiKeys: () => Promise<void>;
@@ -64,8 +67,24 @@ interface AppState {
   updateStreak: () => Promise<void>;
   penalizeTraining: (xp: number) => Promise<void>;
   fetchUsers: () => Promise<void>;
-  isLessonUnlocked: (lessonId: string) => boolean;
-  getNextLesson: (lessonId: string) => Lesson | null;
+isLessonUnlocked: (lessonId: string) => boolean;
+   getNextLesson: (lessonId: string) => Lesson | null;
+   
+   fetchPosts: (page?: number, limit?: number, language?: string) => Promise<{ posts: Post[]; total: number }>;
+   createPost: (title_en: string, title_vi: string, content_en: string, content_vi: string, language: string, category?: string) => Promise<boolean>;
+   fetchReplies: (postId: string) => Promise<Reply[]>;
+   createReply: (postId: string, content_en: string, content_vi: string, parent_id?: string, language?: string) => Promise<boolean>;
+   votePost: (postId: string, vote: 1 | -1) => Promise<VoteResult>;
+   voteReply: (replyId: string, vote: 1 | -1) => Promise<VoteResult>;
+   voteAnnouncement: (announcementId: string, vote: 1 | -1) => Promise<VoteResult>;
+   deletePost: (postId: string) => Promise<boolean>;
+   updatePost: (postId: string, updates: Partial<Post>) => Promise<boolean>;
+   updateAnnouncement: (announcementId: string, updates: { title_en?: string; title_vi?: string; content_en?: string; content_vi?: string }) => Promise<boolean>;
+   changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+   reorderLessons: (ids: string[]) => Promise<boolean>;
+   reorderBots: (ids: string[]) => Promise<boolean>;
+   reorderTopics: (ids: string[]) => Promise<boolean>;
+   deleteUser: (userId: string) => Promise<boolean>;
 }
 
 const STORAGE_KEY = 'debatecrab_config';
@@ -104,10 +123,13 @@ export const useStore = create<AppState>((set, get) => ({
   announcements: [],
   aiConfigured: false,
   apiModel: 'openrouter/auto',
-  aiKeys: [],
-  isLoading: true,
+aiKeys: [],
+   isLoading: true,
+   posts: [],
+   replies: [],
+   currentPostId: null,
 
-  initApp: async () => {
+   initApp: async () => {
     try {
       set({ isLoading: true });
       const userRes = await fetch('/api/auth/me');
@@ -486,7 +508,7 @@ export const useStore = create<AppState>((set, get) => ({
       console.error(e);
     }
   },
-  unbanUser: async (userId) => {
+unbanUser: async (userId) => {
     try {
       const res = await fetch(`/api/admin/users/${userId}/ban`, {
         method: 'POST',
@@ -542,6 +564,254 @@ export const useStore = create<AppState>((set, get) => ({
     } catch (e) {
       console.error(e);
     }
+  },
+
+  fetchPosts: async (page = 1, limit = 20, language?: string) => {
+    try {
+      const url = new URL('/api/community/posts', window.location.origin);
+      url.searchParams.set('page', String(page));
+      url.searchParams.set('limit', String(limit));
+      if (language) url.searchParams.set('language', language);
+      const res = await fetch(url.toString());
+      if (res.ok) {
+        const data = await res.json();
+        set({ posts: data.posts || [] });
+        return { posts: data.posts || [], total: data.total || 0 };
+      }
+      return { posts: [], total: 0 };
+    } catch (e) {
+      console.error(e);
+      return { posts: [], total: 0 };
+    }
+  },
+  createPost: async (title_en, title_vi, content_en, content_vi, language, category) => {
+    try {
+      const res = await fetch('/api/community/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title_en, title_vi, content_en, content_vi, language, category }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          set({ posts: [data, ...get().posts] });
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
+  },
+  fetchReplies: async (postId) => {
+    try {
+      const res = await fetch(`/api/community/posts/${postId}/replies`);
+      if (res.ok) {
+        const data = await res.json();
+        set({ replies: data.replies || [] });
+        return data.replies || [];
+      }
+      return [];
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  },
+  createReply: async (postId, content_en, content_vi, parent_id?: string, language?: string) => {
+    try {
+      const res = await fetch(`/api/community/posts/${postId}/replies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_en, content_vi, parent_id, language }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          set({ replies: [...get().replies, data] });
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
+  },
+  votePost: async (postId, vote) => {
+    try {
+      const res = await fetch(`/api/community/posts/${postId}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vote }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          const posts = get().posts.map(p => p.id === postId ? { ...p, upvotes: p.upvotes + vote, downvotes: p.downvotes + (vote === 1 ? 0 : 1) } : p);
+          set({ posts });
+          const post = posts.find(p => p.id === postId);
+          return { success: true, score: post ? post.upvotes - post.downvotes : 0, count: 0, user_vote: vote };
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return { success: false, score: 0, count: 0, user_vote: 0 };
+  },
+  voteReply: async (replyId, vote) => {
+    try {
+      const res = await fetch(`/api/community/replies/${replyId}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vote }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          const replies = get().replies.map(r => r.id === replyId ? { ...r, upvotes: r.upvotes + vote, downvotes: r.downvotes + (vote === 1 ? 0 : 1) } : r);
+          set({ replies });
+          const reply = replies.find(r => r.id === replyId);
+          return { success: true, score: reply ? reply.upvotes - reply.downvotes : 0, count: 0, user_vote: vote };
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return { success: false, score: 0, count: 0, user_vote: 0 };
+  },
+  voteAnnouncement: async (announcementId, vote) => {
+    try {
+      const res = await fetch(`/api/announcements/${announcementId}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vote }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          return { success: true, score: 0, count: 0, user_vote: vote };
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return { success: false, score: 0, count: 0, user_vote: 0 };
+  },
+  deletePost: async (postId) => {
+    try {
+      const res = await fetch(`/api/admin/posts/${postId}`, { method: 'DELETE' });
+      if (res.ok) {
+        set({ posts: get().posts.filter(p => p.id !== postId) });
+        return true;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
+  },
+  updatePost: async (postId, updates) => {
+    try {
+      const res = await fetch(`/api/admin/posts/${postId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) {
+        const posts = get().posts.map(p => p.id === postId ? { ...p, ...updates } : p);
+        set({ posts });
+        return true;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
+  },
+  updateAnnouncement: async (announcementId, updates) => {
+    try {
+      const res = await fetch(`/api/admin/announcements/${announcementId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) {
+        const announcements = get().announcements.map(a => a.id === announcementId ? { ...a, ...updates } : a);
+        set({ announcements });
+        return true;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
+  },
+  changePassword: async (oldPassword, newPassword) => {
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true };
+      }
+      return { success: false, error: data.error };
+    } catch (e) {
+      console.error(e);
+      return { success: false, error: 'Network error occurred' };
+    }
+  },
+  reorderLessons: async (ids) => {
+    try {
+      const res = await fetch('/api/admin/reorder/lessons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (res.ok) await get().fetchUsers();
+      return res.ok;
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
+  },
+  reorderBots: async (ids) => {
+    try {
+      const res = await fetch('/api/admin/reorder/bots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (res.ok) await get().fetchUsers();
+      return res.ok;
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
+  },
+  reorderTopics: async (ids) => {
+    try {
+      const res = await fetch('/api/admin/reorder/topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (res.ok) await get().fetchUsers();
+      return res.ok;
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
+  },
+  deleteUser: async (userId) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+      if (res.ok) {
+        set({ users: get().users.filter(u => u.id !== userId) });
+        return true;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
   },
 
   completeLesson: async (lessonId) => {

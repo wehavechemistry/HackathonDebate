@@ -76,20 +76,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Announcements */}
-      {announcements.length > 0 && (
-        <section className="max-w-5xl mx-auto px-6 mb-12">
-          <div className="info-block">
-            {announcements.map(a => (
-              <div key={a.id} className="mb-2 last:mb-0">
-                <h3 className="font-bold text-orange-400">{language === 'vi' ? a.title_vi : a.title_en}</h3>
-                <p className="text-sm text-slate-300 font-medium">{language === 'vi' ? a.content_vi : a.content_en}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* Features */}
       <section className="max-w-5xl mx-auto px-6 pb-20">
         <div className="grid sm:grid-cols-2 gap-6">

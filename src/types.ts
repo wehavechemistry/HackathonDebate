@@ -139,3 +139,44 @@ export interface AiApiKey {
   priority: number;
   enabled: boolean;
 }
+
+export interface Post {
+  id: string;
+  title_en: string;
+  title_vi: string;
+  content_en: string;
+  content_vi: string;
+  author_id: string;
+  author_name: string;
+  created_at: string;
+  updated_at: string;
+  language: string;
+  upvotes: number;
+  downvotes: number;
+  category: string;
+  reply_count?: number;
+  user_vote?: number;
+}
+
+export interface Reply {
+  id: string;
+  post_id: string;
+  parent_id: string | null;
+  content_en: string;
+  content_vi: string;
+  author_id: string;
+  author_name: string;
+  created_at: string;
+  updated_at: string;
+  language: string;
+  upvotes: number;
+  downvotes: number;
+  user_vote?: number;
+}
+
+export interface VoteResult {
+  success: boolean;
+  score: number;
+  count: number;
+  user_vote: number;
+}

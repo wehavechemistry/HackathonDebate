@@ -1,37 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Key, Server, Sun, Moon, Globe } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
+import { Sun, Moon, Globe } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import CoachCrab from '../components/CoachCrab';
 
 export default function Settings() {
-  const { currentUser, language, theme, aiConfigured, apiModel, saveAiConfig, toggleTheme, toggleLanguage } = useStore();
-  const [key, setKey] = useState('');
-  const [model, setModel] = useState(apiModel);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    setModel(apiModel);
-  }, [apiModel]);
+  const { currentUser, language, theme, toggleTheme, toggleLanguage } = useStore();
 
   if (!currentUser) return <Navigate to="/login" />;
-
-  const isAdmin = currentUser.role === 'admin' || currentUser.role === 'head_admin';
-
-  const handleSave = async () => {
-    if (!isAdmin) return;
-    setError('');
-    const success = await saveAiConfig(key, model || 'openrouter/auto');
-    if (!success) {
-      setError(language === 'vi' ? 'Lỗi khi lưu cài đặt AI.' : 'Failed to save AI settings.');
-      return;
-    }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -41,61 +18,6 @@ export default function Settings() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-        {/* API Config */}
-        <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
-          <h2 className="font-semibold text-white flex items-center gap-2 mb-2">
-            <Key size={18} className="text-orange-400" />
-            {t('settings.api', language)}
-          </h2>
-          <p className="text-sm text-slate-400 mb-4">{t('settings.api_desc', language)}</p>
-
-          {isAdmin ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1">{t('common.api_key', language)}</label>
-                <input
-                  type="password"
-                  value={key}
-                  onChange={e => setKey(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder={t('common.api_placeholder', language)}
-                />
-              </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">{t('common.model', language)}</label>
-              <div className="flex items-center gap-2">
-                <Server size={16} className="text-slate-500" />
-                <input
-                  type="text"
-                  value={model}
-                  onChange={e => setModel(e.target.value)}
-                  className="flex-1 px-4 py-2.5 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="openrouter/auto"
-                />
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {language === 'vi' ? 'Mặc định: openrouter/auto' : 'Default: openrouter/auto'}
-              </p>
-            </div>
-
-            <button
-              onClick={handleSave}
-              className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-all"
-            >
-              {saved
-                ? (language === 'vi' ? 'Đã lưu!' : 'Saved!')
-                : t('common.save_settings', language)}
-            </button>
-          </div>          ) : (
-            <div className="rounded-xl bg-slate-900/20 border border-slate-700/60 p-4 text-sm text-slate-300">
-              {language === 'vi'
-                ? 'AI chỉ được quản lý bởi admin. Liên hệ admin để cấu hình AI.'
-                : 'AI settings are only managed by administrators. Please contact your site admin to configure AI access.'}
-            </div>
-          )}        </div>
-
-        {/* Theme & Language */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div>

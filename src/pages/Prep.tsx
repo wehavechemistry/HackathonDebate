@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useStore } from '../store';
 import { t } from '../i18n';
@@ -7,7 +8,9 @@ import MarkdownRenderer from '../components/MarkdownRenderer';
 import CoachCrab from '../components/CoachCrab';
 
 export default function Prep() {
-  const { language, aiConfigured, addActivity, addNote } = useStore();
+  const { language, aiConfigured, addActivity, addNote, currentUser } = useStore();
+
+  if (!currentUser) return <Navigate to="/login" />;
   const [topic, setTopic] = useState('');
   const [position, setPosition] = useState<'for' | 'against'>('for');
   const [result, setResult] = useState('');

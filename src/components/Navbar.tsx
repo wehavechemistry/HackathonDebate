@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, Sun, Moon, Globe, User, LogOut, Settings, Shield, LayoutDashboard, UserCircle, Wrench, Sparkles } from 'lucide-react';
 import { useStore } from '../store';
@@ -11,6 +11,8 @@ export default function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { theme, toggleTheme, language, toggleLanguage, currentUser, logout } = useStore();
   const location = useLocation();
+  const navigate = useNavigate();
+  const isDark = theme === 'dark';
 
   const navLinks = [
     { to: '/', label: t('nav.home', language) },
@@ -19,13 +21,20 @@ export default function Navbar() {
     { to: '/training', label: t('nav.training', language) },
     { to: '/prep', label: t('nav.prepare', language) },
     { to: '/topics', label: t('nav.topics', language) },
+    { to: '/community', label: t('nav.community', language) },
+    { to: '/announcements', label: t('nav.announcements', language) },
   ];
 
   const isActive = (path: string) => location.pathname === path;
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'head_admin';
 
+  const linkBase = isDark ? 'text-[#9494a8]' : 'text-slate-600';
+  const linkHover = isDark ? 'hover:text-white hover:bg-white/[0.03]' : 'hover:text-slate-900 hover:bg-black/[0.04]';
+  const linkActive = isDark ? 'text-amber-400 bg-amber-400/8' : 'text-orange-600 bg-orange-500/10';
+  const activeBg = isDark ? 'bg-amber-400/8' : 'bg-orange-500/10';
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.04] bg-[#0a0a0f]/80 backdrop-blur-2xl shadow-2xl shadow-black/40">
+    <nav className={`fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-2xl shadow-2xl ${isDark ? 'border-white/[0.04] bg-[#0a0a0f]/80 shadow-black/40' : 'border-black/[0.06] bg-white/80 shadow-black/5'}`}>
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -44,14 +53,14 @@ export default function Navbar() {
                   to={link.to}
                   className={`relative px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     active
-                      ? 'text-amber-400 bg-amber-400/8'
-                      : 'text-[#9494a8] hover:text-white hover:bg-white/[0.03]'
+                      ? `${linkActive}`
+                      : `${linkBase} ${linkHover}`
                   }`}
                 >
                   {active && (
                     <motion.span
                       layoutId="nav-active-bg"
-                      className="absolute inset-0 bg-amber-400/8 rounded-lg -z-10"
+                      className={`absolute inset-0 rounded-lg -z-10 ${activeBg}`}
                       transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                     />
                   )}
@@ -65,15 +74,15 @@ export default function Navbar() {
           <div className="flex items-center gap-2">
             <button
               onClick={toggleLanguage}
-              className="p-2 rounded-lg text-[#9494a8] hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+              className={`p-2 rounded-lg transition-all cursor-pointer ${isDark ? 'text-[#9494a8] hover:text-white hover:bg-white/5' : 'text-slate-500 hover:text-slate-900 hover:bg-black/5'}`}
               title={language === 'en' ? 'Switch to Vietnamese' : 'Chuyển sang Tiếng Anh'}
             >
               <Globe size={18} />
-              <span className="ml-1 text-xs font-semibold">{language.toUpperCase()}</span>
+              <span className={`ml-1 text-xs font-semibold ${isDark ? 'text-[#9494a8]' : 'text-slate-500'}`}>{language.toUpperCase()}</span>
             </button>
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg text-[#9494a8] hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+              className={`p-2 rounded-lg transition-all cursor-pointer ${isDark ? 'text-[#9494a8] hover:text-white hover:bg-white/5' : 'text-slate-500 hover:text-slate-900 hover:bg-black/5'}`}
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -83,12 +92,12 @@ export default function Navbar() {
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all hover:bg-white/[0.06] cursor-pointer ${
-                    isAdmin ? 'text-amber-400' : 'text-[#9494a8]'
+                    isAdmin ? (isDark ? 'text-amber-400' : 'text-orange-600') : (isDark ? 'text-[#9494a8]' : 'text-slate-600')
                   }`}
                 >
                   <User size={16} />
                   <span className="hidden sm:inline max-w-[120px] truncate">{currentUser.username}</span>
-                  {isAdmin && <Shield size={14} className="text-amber-400" />}
+                  {isAdmin && <Shield size={14} className={isDark ? 'text-amber-400' : 'text-orange-500'} />}
                 </button>
                 <AnimatePresence>
                   {userMenuOpen && (
@@ -96,12 +105,12 @@ export default function Navbar() {
                       initial={{ opacity: 0, y: -8, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                      className="absolute right-0 mt-2 w-48 bg-[#0a0a0f]/95 backdrop-blur-2xl border border-white/[0.06] rounded-xl shadow-2xl shadow-black/40 overflow-hidden"
+                      className={`absolute right-0 mt-2 w-48 rounded-xl shadow-2xl overflow-hidden ${isDark ? 'bg-[#0a0a0f]/95 backdrop-blur-2xl border border-white/[0.06] shadow-black/40' : 'bg-white/95 backdrop-blur-2xl border border-black/[0.06] shadow-black/10'}`}
                     >
                       <Link
                         to="/dashboard"
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2 px-4 py-3 text-sm text-[#9494a8] hover:bg-white/[0.04] hover:text-white transition-colors"
+                        className={`flex items-center gap-2 px-4 py-3 text-sm transition-colors ${isDark ? 'text-[#9494a8] hover:bg-white/[0.04] hover:text-white' : 'text-slate-600 hover:bg-black/[0.04] hover:text-slate-900'}`}
                       >
                         <LayoutDashboard size={14} />
                         {t('nav.dashboard', language)}
@@ -109,7 +118,7 @@ export default function Navbar() {
                       <Link
                         to="/profile"
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2 px-4 py-3 text-sm text-[#9494a8] hover:bg-white/[0.04] hover:text-white transition-colors"
+                        className={`flex items-center gap-2 px-4 py-3 text-sm transition-colors ${isDark ? 'text-[#9494a8] hover:bg-white/[0.04] hover:text-white' : 'text-slate-600 hover:bg-black/[0.04] hover:text-slate-900'}`}
                       >
                         <UserCircle size={14} />
                         {t('nav.profile', language)}
@@ -117,7 +126,7 @@ export default function Navbar() {
                       <Link
                         to="/settings"
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2 px-4 py-3 text-sm text-[#9494a8] hover:bg-white/[0.04] hover:text-white transition-colors"
+                        className={`flex items-center gap-2 px-4 py-3 text-sm transition-colors ${isDark ? 'text-[#9494a8] hover:bg-white/[0.04] hover:text-white' : 'text-slate-600 hover:bg-black/[0.04] hover:text-slate-900'}`}
                       >
                         <Wrench size={14} />
                         {t('nav.settings', language)}
@@ -126,15 +135,15 @@ export default function Navbar() {
                         <Link
                           to="/admin"
                           onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2 px-4 py-3 text-sm text-amber-400 hover:bg-white/[0.04] hover:text-amber-300 transition-colors"
+                          className={`flex items-center gap-2 px-4 py-3 text-sm transition-colors ${isDark ? 'text-amber-400 hover:bg-white/[0.04] hover:text-amber-300' : 'text-orange-600 hover:bg-black/[0.04] hover:text-orange-500'}`}
                         >
                           <Shield size={14} />
                           {t('nav.admin', language)}
                         </Link>
                       )}
                         <button
-                          onClick={() => { logout(); setUserMenuOpen(false); }}
-                          className="flex items-center gap-2 w-full px-4 py-3 text-sm text-red-400 hover:bg-red-500/8 hover:text-red-300 transition-colors cursor-pointer text-left"
+                          onClick={() => { logout(); setUserMenuOpen(false); navigate('/'); }}
+                          className={`flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors cursor-pointer text-left ${isDark ? 'text-red-400 hover:bg-red-500/8 hover:text-red-300' : 'text-red-600 hover:bg-red-500/8 hover:text-red-500'}`}
                         >
                         <LogOut size={14} />
                         {t('nav.logout', language)}
@@ -147,13 +156,13 @@ export default function Navbar() {
               <div className="flex items-center gap-2">
                 <Link
                   to="/login"
-                  className="px-3 py-1.5 text-sm text-[#9494a8] hover:text-white transition-colors font-medium"
+                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${isDark ? 'text-[#9494a8] hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
                 >
                   {t('nav.login', language)}
                 </Link>
                 <Link
                   to="/register"
-                  className="px-4 py-1.5 text-sm bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-medium rounded-lg shadow-lg shadow-amber-500/15 transition-all hover:scale-105 active:scale-95"
+                  className={`px-4 py-1.5 text-sm font-medium rounded-lg shadow-lg transition-all hover:scale-105 active:scale-95 ${isDark ? 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white shadow-amber-500/15' : 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white shadow-orange-500/15'}`}
                 >
                   {t('nav.register', language)}
                 </Link>
@@ -163,7 +172,7 @@ export default function Navbar() {
             {/* Mobile menu button */}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="md:hidden p-2 rounded-lg text-[#9494a8] hover:text-white hover:bg-white/5"
+              className={`md:hidden p-2 rounded-lg transition-all ${isDark ? 'text-[#9494a8] hover:text-white hover:bg-white/5' : 'text-slate-600 hover:text-slate-900 hover:bg-black/5'}`}
             >
               {mobileOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -177,7 +186,7 @@ export default function Navbar() {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="md:hidden overflow-hidden border-t border-white/[0.04] bg-[#0a0a0f]/95"
+              className={`md:hidden overflow-hidden border-t ${isDark ? 'border-white/[0.04] bg-[#0a0a0f]/95' : 'border-black/[0.06] bg-white/95'}`}
             >
               <div className="py-3 space-y-1">
                 {navLinks.map(link => (
@@ -187,8 +196,8 @@ export default function Navbar() {
                     onClick={() => setMobileOpen(false)}
                     className={`block px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                       isActive(link.to)
-                        ? 'text-amber-400 bg-amber-400/8 border-l-2 border-amber-500'
-                        : 'text-[#9494a8] hover:text-white hover:bg-white/[0.03]'
+                        ? `${linkActive} border-l-2 ${isDark ? 'border-amber-500' : 'border-orange-500'}`
+                        : `${linkBase} ${linkHover}`
                     }`}
                   >
                     {link.label}

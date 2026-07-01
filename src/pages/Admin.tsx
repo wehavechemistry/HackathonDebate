@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BookOpen, Users, Bot, FileText, Megaphone, Plus, Trash2, Edit3, Shield, Ban, Pin, Save, X, Key, CheckCircle, XCircle, ArrowUpDown } from 'lucide-react';
+import { BookOpen, Users, Bot, FileText, Megaphone, Plus, Trash2, Edit3, Shield, Ban, Pin, Save, X, Key, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import CoachCrab from '../components/CoachCrab';
-import type { Lesson, Topic, BotPersonality, Announcement } from '../types';
+import type { Lesson, Topic, BotPersonality, Announcement, Post } from '../types';
 
-type Tab = 'lessons' | 'users' | 'bots' | 'topics' | 'announcements' | 'ai_keys' | 'create_admin';
+type Tab = 'lessons' | 'users' | 'bots' | 'topics' | 'announcements' | 'announcements_manage' | 'ai_keys' | 'create_admin' | 'community';
 
 export default function Admin() {
   const store = useStore();
@@ -26,7 +26,8 @@ export default function Admin() {
     { key: 'users', label: t('admin.users', language), icon: Users },
     { key: 'bots', label: t('admin.bots', language), icon: Bot },
     { key: 'topics', label: t('admin.topics', language), icon: FileText },
-    { key: 'announcements', label: t('admin.announcements', language), icon: Megaphone },
+    { key: 'announcements_manage', label: t('admin.announcements_manage', language), icon: Megaphone },
+    { key: 'community', label: t('admin.community', language), icon: FileText },
     { key: 'ai_keys', label: t('admin.ai_keys', language), icon: Key },
     { key: 'create_admin', label: t('admin.create_admin', language), icon: Shield, headOnly: true },
   ];
@@ -60,7 +61,8 @@ export default function Admin() {
         {tab === 'users' && <UsersManager />}
         {tab === 'bots' && <BotsManager />}
         {tab === 'topics' && <TopicsManager />}
-        {tab === 'announcements' && <AnnouncementsManager />}
+        {tab === 'announcements_manage' && <AnnouncementsManager />}
+        {tab === 'community' && <CommunityManager />}
         {tab === 'ai_keys' && <AiKeysManager />}
         {tab === 'create_admin' && isHeadAdmin && <CreateAdmin />}
       </motion.div>
@@ -69,10 +71,23 @@ export default function Admin() {
 }
 
 function LessonsManager() {
-  const { lessons, language, addLesson, updateLesson, deleteLesson } = useStore();
+  const { lessons, language, addLesson, updateLesson, deleteLesson, reorderLessons } = useStore();
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<Partial<Lesson>>({});
+
+  const moveLesson = async (id: string, direction: 'up' | 'down') => {
+    const sorted = [...lessons].sort((a, b) => {
+      if (a.level !== b.level) return a.level.localeCompare(b.level);
+      return a.order - b.order;
+    });
+    const idx = sorted.findIndex(l => l.id === id);
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= sorted.length) return;
+    const newSorted = [...sorted];
+    [newSorted[idx], newSorted[newIdx]] = [newSorted[newIdx], newSorted[idx]];
+    await reorderLessons(newSorted.map(l => l.id));
+  };
 
   const startCreate = () => {
     setForm({ id: 'l_' + Date.now(), level: 'beginner', title_en: '', title_vi: '', content_en: '', content_vi: '', order: lessons.length + 1, pinned: false });
@@ -180,7 +195,13 @@ function LessonsManager() {
               <span className="text-sm text-white truncate">{language === 'vi' ? l.title_vi : l.title_en}</span>
               {l.pinned && <Pin size={12} className="text-orange-400 shrink-0" />}
             </div>
-            <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+             <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => moveLesson(l.id, 'up')} className="p-1.5 text-slate-400 hover:text-orange-400 transition-colors" title="Move Up">
+                <ArrowUp size={14} />
+              </button>
+              <button onClick={() => moveLesson(l.id, 'down')} className="p-1.5 text-slate-400 hover:text-orange-400 transition-colors" title="Move Down">
+                <ArrowDown size={14} />
+              </button>
               <button onClick={() => updateLesson(l.id, { pinned: !l.pinned })} className="p-1.5 text-slate-400 hover:text-orange-400 transition-colors" title={l.pinned ? 'Unpin' : 'Pin'}>
                 <Pin size={14} />
               </button>
@@ -195,11 +216,17 @@ function LessonsManager() {
 }
 
 function UsersManager() {
-  const { users, language, banUser, unbanUser, fetchUsers } = useStore();
+  const { users, language, banUser, unbanUser, deleteUser, fetchUsers } = useStore();
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Permanently delete this user?')) {
+      await deleteUser(id);
+    }
+  };
 
   return (
     <div>
@@ -216,7 +243,7 @@ function UsersManager() {
               <p className="text-xs text-slate-500">{user.email} | {user.role}</p>
             </div>
             {user.role === 'user' && (
-              <div className="shrink-0">
+              <div className="shrink-0 flex gap-1">
                 {user.banned ? (
                   <button onClick={() => unbanUser(user.id)} className="px-3 py-1 text-xs bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded-lg transition-all">
                     {t('admin.unban', language)}
@@ -226,6 +253,9 @@ function UsersManager() {
                     {t('admin.ban', language)}
                   </button>
                 )}
+                <button onClick={() => handleDelete(user.id)} className="p-1 text-slate-400 hover:text-red-400 transition-colors">
+                  <Trash2 size={14} />
+                </button>
               </div>
             )}
           </div>
@@ -236,10 +266,20 @@ function UsersManager() {
 }
 
 function BotsManager() {
-  const { bots, language, addBot, updateBot, deleteBot } = useStore();
+  const { bots, language, addBot, updateBot, deleteBot, reorderBots } = useStore();
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<Partial<BotPersonality>>({});
+
+  const moveBot = async (id: string, direction: 'up' | 'down') => {
+    const sorted = [...bots].sort((a, b) => a.displayStrength - b.displayStrength || a.id.localeCompare(b.id));
+    const idx = sorted.findIndex(b => b.id === id);
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= sorted.length) return;
+    const newSorted = [...sorted];
+    [newSorted[idx], newSorted[newIdx]] = [newSorted[newIdx], newSorted[idx]];
+    await reorderBots(newSorted.map(b => b.id));
+  };
 
   const startCreate = () => {
     setForm({ id: 'bot_' + Date.now(), name: '', avatar: 'engine', bio_en: '', bio_vi: '', displayStrength: 5, hiddenPrompt: '', knowledge: 5, logic: 5, rebuttal: 5, vocabulary: 5, creativity: 5, confidence: 5 });
@@ -329,7 +369,9 @@ function BotsManager() {
               <span className="text-sm text-white font-medium">{bot.name}</span>
               <span className="text-xs text-slate-400">Str: {bot.displayStrength}</span>
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => moveBot(bot.id, 'up')} className="p-1.5 text-slate-400 hover:text-orange-400" title="Move Up"><ArrowUp size={14} /></button>
+              <button onClick={() => moveBot(bot.id, 'down')} className="p-1.5 text-slate-400 hover:text-orange-400" title="Move Down"><ArrowDown size={14} /></button>
               <button onClick={() => startEdit(bot)} className="p-1.5 text-slate-400 hover:text-blue-400"><Edit3 size={14} /></button>
               <button onClick={() => deleteBot(bot.id)} className="p-1.5 text-slate-400 hover:text-red-400"><Trash2 size={14} /></button>
             </div>
@@ -341,12 +383,22 @@ function BotsManager() {
 }
 
 function TopicsManager() {
-  const { topics, language, addTopic, updateTopic, deleteTopic } = useStore();
+  const { topics, language, addTopic, updateTopic, deleteTopic, reorderTopics } = useStore();
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<Partial<Topic>>({});
 
   const categories = ['education', 'technology', 'environment', 'economics', 'politics', 'society', 'media', 'culture', 'misc'];
+
+  const moveTopic = async (id: string, direction: 'up' | 'down') => {
+    const sorted = [...topics].sort((a, b) => a.category.localeCompare(b.category) || a.id.localeCompare(b.id));
+    const idx = sorted.findIndex(t => t.id === id);
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= sorted.length) return;
+    const newSorted = [...sorted];
+    [newSorted[idx], newSorted[newIdx]] = [newSorted[newIdx], newSorted[idx]];
+    await reorderTopics(newSorted.map(t => t.id));
+  };
 
   const startCreate = () => {
     setForm({ id: 't_' + Date.now(), category: 'education', title_en: '', title_vi: '', content_en: '', content_vi: '' });
@@ -422,7 +474,9 @@ function TopicsManager() {
               <span className="text-xs text-slate-400 bg-slate-700/50 px-2 py-0.5 rounded capitalize shrink-0">{tp.category}</span>
               <span className="text-sm text-white truncate">{language === 'vi' ? tp.title_vi : tp.title_en}</span>
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <button onClick={() => moveTopic(tp.id, 'up')} className="p-1.5 text-slate-400 hover:text-orange-400" title="Move Up"><ArrowUp size={14} /></button>
+              <button onClick={() => moveTopic(tp.id, 'down')} className="p-1.5 text-slate-400 hover:text-orange-400" title="Move Down"><ArrowDown size={14} /></button>
               <button onClick={() => startEdit(tp)} className="p-1.5 text-slate-400 hover:text-blue-400"><Edit3 size={14} /></button>
               <button onClick={() => deleteTopic(tp.id)} className="p-1.5 text-slate-400 hover:text-red-400"><Trash2 size={14} /></button>
             </div>
@@ -434,8 +488,9 @@ function TopicsManager() {
 }
 
 function AnnouncementsManager() {
-  const { announcements, language, addAnnouncement, deleteAnnouncement } = useStore();
+  const { announcements, language, addAnnouncement, deleteAnnouncement, updateAnnouncement } = useStore();
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ title_en: '', title_vi: '', content_en: '', content_vi: '' });
 
   const save = () => {
@@ -445,16 +500,29 @@ function AnnouncementsManager() {
     setForm({ title_en: '', title_vi: '', content_en: '', content_vi: '' });
   };
 
+  const startEdit = (ann: any) => {
+    setForm({ title_en: ann.title_en, title_vi: ann.title_vi || '', content_en: ann.content_en, content_vi: ann.content_vi || '' });
+    setEditingId(ann.id);
+    setCreating(false);
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    await updateAnnouncement(editingId, form);
+    setEditingId(null);
+    setForm({ title_en: '', title_vi: '', content_en: '', content_vi: '' });
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-white">{t('admin.announcements', language)}</h2>
+        <h2 className="text-lg font-semibold text-white">{t('admin.announcements_manage', language)}</h2>
         <button onClick={() => setCreating(true)} className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-lg">
           <Plus size={14} /> Add
         </button>
       </div>
 
-      {creating && (
+      {(creating || editingId) && (
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-5 mb-6 space-y-3">
           <div className="grid sm:grid-cols-2 gap-3">
             <input type="text" value={form.title_en} onChange={e => setForm({ ...form, title_en: e.target.value })} placeholder="Title (EN)"
@@ -469,8 +537,8 @@ function AnnouncementsManager() {
               className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" />
           </div>
           <div className="flex gap-2">
-            <button onClick={save} className="px-4 py-2 bg-orange-500 text-white text-sm rounded-lg">Save</button>
-            <button onClick={() => setCreating(false)} className="px-4 py-2 bg-slate-700 text-white text-sm rounded-lg">Cancel</button>
+            <button onClick={editingId ? saveEdit : save} className="px-4 py-2 bg-orange-500 text-white text-sm rounded-lg flex items-center gap-1"><Save size={14} /> {editingId ? 'Update' : 'Save'}</button>
+            <button onClick={() => { setCreating(false); setEditingId(null); }} className="px-4 py-2 bg-slate-700 text-white text-sm rounded-lg"><X size={14} /> Cancel</button>
           </div>
         </div>
       )}
@@ -480,14 +548,83 @@ function AnnouncementsManager() {
           <div key={a.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 group">
             <div className="min-w-0">
               <p className="text-sm text-white font-medium">{language === 'vi' ? a.title_vi : a.title_en}</p>
-              <p className="text-xs text-slate-500">{new Date(a.createdAt).toLocaleDateString()}</p>
+              <div className="flex items-center gap-3 mt-0.5">
+                <p className="text-xs text-slate-500">{new Date(a.createdAt).toLocaleDateString()}</p>
+                <span className="text-xs text-slate-400">Votes: {((a as any).upvotes || 0) - ((a as any).downvotes || 0)}</span>
+              </div>
             </div>
-            <button onClick={() => deleteAnnouncement(a.id)} className="p-1.5 text-slate-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-              <Trash2 size={14} />
-            </button>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <button onClick={() => startEdit(a)} className="p-1.5 text-slate-400 hover:text-blue-400"><Edit3 size={14} /></button>
+              <button onClick={() => deleteAnnouncement(a.id)} className="p-1.5 text-slate-400 hover:text-red-400"><Trash2 size={14} /></button>
+            </div>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function CommunityManager() {
+  const { posts, language, deletePost, updatePost, fetchPosts } = useStore();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ upvotes: 0, downvotes: 0 });
+
+  useEffect(() => {
+    fetchPosts(1, 50);
+  }, [fetchPosts]);
+
+  const startEditVotes = (post: Post) => {
+    setEditForm({ upvotes: post.upvotes, downvotes: post.downvotes });
+    setEditingId(post.id);
+  };
+
+  const saveEditVotes = async () => {
+    if (!editingId) return;
+    await updatePost(editingId, editForm);
+    setEditingId(null);
+  };
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-white mb-4">{t('admin.community', language)} ({posts.length})</h2>
+      <div className="space-y-2">
+        {posts.map(post => (
+          <div key={post.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 group">
+            <div className="min-w-0">
+              <p className="text-sm text-white font-medium truncate">{language === 'vi' ? post.title_vi : post.title_en}</p>
+              <p className="text-xs text-slate-500">by {post.author_name} | Votes: {post.upvotes - post.downvotes}</p>
+            </div>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <button onClick={() => startEditVotes(post)} className="p-1.5 text-slate-400 hover:text-blue-400" title="Edit votes"><Edit3 size={14} /></button>
+              <button onClick={() => deletePost(post.id)} className="p-1.5 text-slate-400 hover:text-red-400"><Trash2 size={14} /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {editingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setEditingId(null)}>
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <h3 className="text-white font-semibold mb-4">Edit Post Votes</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Upvotes</label>
+                <input type="number" value={editForm.upvotes} onChange={e => setEditForm({ ...editForm, upvotes: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Downvotes</label>
+                <input type="number" value={editForm.downvotes} onChange={e => setEditForm({ ...editForm, downvotes: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm" />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={saveEditVotes} className="flex-1 py-2 bg-orange-500 text-white text-sm rounded-lg">Save</button>
+                <button onClick={() => setEditingId(null)} className="flex-1 py-2 bg-slate-700 text-white text-sm rounded-lg">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

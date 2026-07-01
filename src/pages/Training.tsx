@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Shuffle, Send, ArrowRight, Award, Flame, Zap } from 'lucide-react';
 import { useStore } from '../store';
@@ -28,6 +29,8 @@ export default function Training() {
   const totalXp = store.currentUser?.totalXp || 0;
   const tier = store.currentUser?.tier || 'bronze';
   const streak = store.currentUser?.streak || 0;
+
+  if (!store.currentUser) return <Navigate to="/login" />;
 
   const [mode, setMode] = useState<Mode>('menu');
   const [difficulty, setDifficulty] = useState<'easy' | 'intermediate' | 'hard'>('easy');

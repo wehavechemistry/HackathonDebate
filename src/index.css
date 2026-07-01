@@ -165,23 +165,91 @@ body {
 .markdown-content th { font-weight: 600; }
 
 /* Light mode overrides */
+.light body, .light {
+  background-color: #f5f3ef;
+  color: #1a1520;
+}
+
 .light .text-white { color: #1a1520 !important; }
 .light .text-slate-100 { color: #1a1520 !important; }
+.light .text-slate-200 { color: #2a2530 !important; }
 .light .text-slate-300 { color: #2a2530 !important; }
 .light .text-slate-400 { color: #5a5565 !important; }
+.light .text-slate-500 { color: #6e6a7a !important; }
+.light .text-slate-600 { color: #4a4655 !important; }
+.light .text-slate-700 { color: #3a3645 !important; }
+.light .text-slate-800 { color: #2a2530 !important; }
+.light .text-slate-900 { color: #1a1520 !important; }
+.light .text-slate-950 { color: #1a1520 !important; }
+
 .light .bg-slate-950\/70 { background: rgba(245, 243, 239, 0.85) !important; }
 .light .bg-slate-950 { background: #f5f3ef !important; }
-.light .bg-slate-900\/40 { background: rgba(245, 243, 239, 0.6) !important; }
-.light .bg-slate-900\/50 { background: rgba(245, 243, 239, 0.7) !important; }
-.light .bg-slate-800\/50 { background: rgba(235, 233, 229, 0.7) !important; }
-.light .bg-slate-800\/30 { background: rgba(235, 233, 229, 0.5) !important; }
-.light .bg-slate-700\/50 { background: rgba(225, 223, 219, 0.6) !important; }
-.light .border-slate-700\/50 { border-color: rgba(200, 198, 194, 0.5) !important; }
-.light .border-slate-600 { border-color: rgba(200, 198, 194, 0.7) !important; }
-.light .border-white\/\[0\.08\] { border-color: rgba(0, 0, 0, 0.06) !important; }
-.light .border-white\/\[0\.06\] { border-color: rgba(0, 0, 0, 0.04) !important; }
-.light .border-white\/\[0\.03\] { border-color: rgba(0, 0, 0, 0.02) !important; }
 .light .bg-slate-950\/50 { background: rgba(245, 243, 239, 0.7) !important; }
 .light .bg-slate-950\/40 { background: rgba(245, 243, 239, 0.5) !important; }
+.light .bg-slate-950\/30 { background: rgba(245, 243, 239, 0.4) !important; }
+.light .bg-slate-950\/20 { background: rgba(245, 243, 239, 0.3) !important; }
+.light .bg-slate-900\/50 { background: rgba(235, 233, 229, 0.7) !important; }
+.light .bg-slate-900\/40 { background: rgba(245, 243, 239, 0.6) !important; }
+.light .bg-slate-900\/30 { background: rgba(235, 233, 229, 0.5) !important; }
+.light .bg-slate-900\/20 { background: rgba(235, 233, 229, 0.4) !important; }
+.light .bg-slate-800\/50 { background: rgba(225, 223, 219, 0.7) !important; }
+.light .bg-slate-800\/30 { background: rgba(235, 233, 229, 0.5) !important; }
+.light .bg-slate-800\/20 { background: rgba(235, 233, 229, 0.4) !important; }
+.light .bg-slate-700\/50 { background: rgba(215, 213, 209, 0.6) !important; }
+.light .bg-slate-700\/30 { background: rgba(225, 223, 219, 0.5) !important; }
+.light .bg-slate-700\/20 { background: rgba(225, 223, 219, 0.4) !important; }
+
+.light .border-slate-700\/50 { border-color: rgba(200, 198, 194, 0.5) !important; }
+.light .border-slate-700\/30 { border-color: rgba(200, 198, 194, 0.4) !important; }
+.light .border-slate-600 { border-color: rgba(180, 178, 174, 0.7) !important; }
+.light .border-slate-600\/50 { border-color: rgba(180, 178, 174, 0.5) !important; }
+.light .border-white\/[0.08] { border-color: rgba(0, 0, 0, 0.06) !important; }
+.light .border-white\/[0.06] { border-color: rgba(0, 0, 0, 0.04) !important; }
+.light .border-white\/[0.04] { border-color: rgba(0, 0, 0, 0.03) !important; }
+.light .border-white\/[0.03] { border-color: rgba(0, 0, 0, 0.02) !important; }
+.light .border-slate-800\/50 { border-color: rgba(180, 178, 174, 0.5) !important; }
+.light .border-slate-800\/80 { border-color: rgba(180, 178, 174, 0.7) !important; }
+.light .border-slate-800 { border-color: rgba(180, 178, 174, 0.8) !important; }
+.light .border-slate-200 { border-color: rgba(180, 178, 174, 0.8) !important; }
+.light .border-slate-100 { border-color: rgba(180, 178, 174, 0.5) !important; }
+.light .border-white\/5 { border-color: rgba(0, 0, 0, 0.05) !important; }
+.light .border-white\/\[0\.06\] { border-color: rgba(0, 0, 0, 0.04) !important; }
+
+.light .bg-white\/50 { background: rgba(255, 255, 255, 0.6) !important; }
+.light .bg-white\/40 { background: rgba(255, 255, 255, 0.5) !important; }
+.light .bg-white\/20 { background: rgba(235, 233, 229, 0.5) !important; }
+.light .bg-white\/10 { background: rgba(235, 233, 229, 0.4) !important; }
+.light .bg-white\/5 { background: rgba(235, 233, 229, 0.3) !important; }
+
 .light .shadow-2xl.shadow-black\/50 { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08) !important; }
 .light .shadow-lg.shadow-black\/20 { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05) !important; }
+
+/* Glass card */
+.light .glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* Premium inputs */
+.light .premium-input {
+  background: rgba(245, 243, 239, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: #1a1520;
+}
+
+/* Info block */
+.light .info-block {
+  border-left: 3px solid #d97706;
+  background: rgba(217, 119, 6, 0.06);
+}
+
+/* Interactive row */
+.light .interactive-row:hover {
+  background: rgba(245, 243, 239, 0.8);
+}
+
+/* Markdown content */
+.light .markdown-content pre { background: rgba(0,0,0,0.05); }
+.light .markdown-content blockquote { border-left-color: #d97706; }
+.light .markdown-content a { color: #d97706; }
+.light .markdown-content th, .light .markdown-content td { border-color: #d1cfc9; }

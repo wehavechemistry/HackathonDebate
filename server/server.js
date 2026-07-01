@@ -137,6 +137,16 @@ const dbAll = (sql, params = []) => {
   });
 };
 
+async function getUserVote(userId, targetType, targetId) {
+  const row = await dbGet('SELECT vote FROM votes WHERE user_id = ? AND target_type = ? AND target_id = ?', [userId, targetType, targetId]);
+  return row ? row.vote : 0;
+}
+
+async function getVoteCount(targetType, targetId) {
+  const row = await dbGet('SELECT SUM(vote) as score, COUNT(*) as count FROM votes WHERE target_type = ? AND target_id = ?', [targetType, targetId]);
+  return { score: row?.score || 0, count: row?.count || 0 };
+}
+
 async function migrateDatabase() {
   // Add columns that may not exist in older databases (ALTER TABLE has no IF NOT EXISTS)
   const migrations = [
@@ -146,6 +156,8 @@ async function migrateDatabase() {
     `ALTER TABLE users ADD COLUMN lastTrainingDate TEXT DEFAULT NULL`,
     `ALTER TABLE users ADD COLUMN tier TEXT NOT NULL DEFAULT 'bronze'`,
     `ALTER TABLE users ADD COLUMN unlockedLessonIds TEXT NOT NULL DEFAULT '[]'`,
+    `ALTER TABLE topics ADD COLUMN order_num INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bots ADD COLUMN order_num INTEGER NOT NULL DEFAULT 0`,
   ];
   for (const sql of migrations) {
     try {
@@ -248,6 +260,53 @@ async function initializeDatabase() {
       model TEXT NOT NULL DEFAULT 'openrouter/auto',
       priority INTEGER NOT NULL DEFAULT 0,
       enabled INTEGER NOT NULL DEFAULT 1
+    )
+  `);
+
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS posts (
+      id TEXT PRIMARY KEY,
+      title_en TEXT NOT NULL,
+      title_vi TEXT NOT NULL,
+      content_en TEXT NOT NULL,
+      content_vi TEXT NOT NULL,
+      author_id TEXT NOT NULL,
+      author_name TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      language TEXT NOT NULL DEFAULT 'en',
+      upvotes INTEGER NOT NULL DEFAULT 0,
+      downvotes INTEGER NOT NULL DEFAULT 0,
+      category TEXT DEFAULT 'general'
+    )
+  `);
+
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS replies (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL,
+      parent_id TEXT,
+      content_en TEXT NOT NULL,
+      content_vi TEXT NOT NULL,
+      author_id TEXT NOT NULL,
+      author_name TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      language TEXT NOT NULL DEFAULT 'en',
+      upvotes INTEGER NOT NULL DEFAULT 0,
+      downvotes INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS votes (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      vote INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(user_id, target_type, target_id)
     )
   `);
 
@@ -909,7 +968,7 @@ app.post('/api/admin/create-admin', async (req, res) => {
 
     await dbRun(`
       INSERT INTO users (id, email, username, password_hash, role, joinDate, completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats, banned, trainingScores, totalXp, streak, lastTrainingDate, tier, unlockedLessonIds)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       userId,
       email,
@@ -1227,6 +1286,332 @@ app.delete('/api/announcements/:id', async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
     await dbRun('DELETE FROM announcements WHERE id = ?', [targetId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/announcements - list all announcements with vote counts
+app.get('/api/announcements', async (req, res) => {
+  try {
+    const announcements = await dbAll('SELECT * FROM announcements ORDER BY createdAt DESC');
+    res.json({ announcements });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error fetching announcements' });
+  }
+});
+
+app.post('/api/announcements/:id/vote', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+  const { vote } = req.body;
+  const targetId = req.params.id;
+  if (vote !== 1 && vote !== -1) {
+    return res.status(400).json({ error: 'Vote must be 1 or -1' });
+  }
+  try {
+    await dbRun(
+      'INSERT OR REPLACE INTO votes (id, user_id, target_type, target_id, vote, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [req.session.userId + '_announcement_' + targetId, req.session.userId, 'announcement', targetId, vote, new Date().toISOString()]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Community Posts
+app.get('/api/community/posts', async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
+  const language = req.query.language || 'en';
+  const offset = (page - 1) * limit;
+  try {
+    const whereLang = language && (language === 'en' || language === 'vi') ? `AND language = '${language.replace(/'/g, "''")}'` : '';
+    const totalRow = await dbGet(`SELECT COUNT(*) as count FROM posts WHERE 1=1 ${whereLang}`);
+    const posts = await dbAll(`SELECT p.*, COALESCE(SUM(v.vote), 0) as netScore FROM posts p LEFT JOIN votes v ON v.target_type = 'post' AND v.target_id = p.id WHERE 1=1 ${whereLang} GROUP BY p.id ORDER BY created_at DESC LIMIT ? OFFSET ?`, [limit, offset]);
+    res.json({ posts, total: totalRow.count });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error fetching posts' });
+  }
+});
+
+app.post('/api/community/posts', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+  const { title_en, title_vi, content_en, content_vi, language, category } = req.body;
+  if (!title_en || !title_vi || !content_en || !content_vi) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  try {
+    const user = await dbGet('SELECT username FROM users WHERE id = ?', [req.session.userId]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const id = 'post_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const now = new Date().toISOString();
+    await dbRun(
+      'INSERT INTO posts (id, title_en, title_vi, content_en, content_vi, author_id, author_name, created_at, updated_at, language, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, title_en, title_vi, content_en, content_vi, req.session.userId, user.username, now, now, language || 'en', category || 'general']
+    );
+    res.json({ success: true, id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error creating post' });
+  }
+});
+
+app.get('/api/community/posts/:id/replies', async (req, res) => {
+  const postId = req.params.id;
+  const parentId = req.query.parent_id || null;
+  try {
+    const sql = parentId
+      ? 'SELECT * FROM replies WHERE post_id = ? AND parent_id = ? ORDER BY created_at ASC'
+      : 'SELECT * FROM replies WHERE post_id = ? AND parent_id IS NULL ORDER BY created_at ASC';
+    const rows = await dbAll(sql, parentId ? [postId, parentId] : [postId]);
+    res.json({ replies: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error fetching replies' });
+  }
+});
+
+app.post('/api/community/posts/:id/replies', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+  const postId = req.params.id;
+  const { content_en, content_vi, parent_id, language } = req.body;
+  if (!content_en || !content_vi) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  try {
+    const user = await dbGet('SELECT username FROM users WHERE id = ?', [req.session.userId]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const id = 'reply_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const now = new Date().toISOString();
+    await dbRun(
+      'INSERT INTO replies (id, post_id, parent_id, content_en, content_vi, author_id, author_name, created_at, updated_at, language) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, postId, parent_id || null, content_en, content_vi, req.session.userId, user.username, now, now, language || 'en']
+    );
+    res.json({ success: true, id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error creating reply' });
+  }
+});
+
+app.post('/api/community/posts/:id/vote', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+  const postId = req.params.id;
+  const { vote } = req.body;
+  if (vote !== 1 && vote !== -1) {
+    return res.status(400).json({ error: 'Vote must be 1 or -1' });
+  }
+  try {
+    const voteId = req.session.userId + '_post_' + postId;
+    await dbRun(
+      'INSERT OR REPLACE INTO votes (id, user_id, target_type, target_id, vote, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [voteId, req.session.userId, 'post', postId, vote, new Date().toISOString()]
+    );
+    const post = await dbGet('SELECT upvotes, downvotes FROM posts WHERE id = ?', [postId]);
+    if (!post) return res.status(404).json({ error: 'Not found' });
+    const oldVote = await getUserVote(req.session.userId, 'post', postId);
+    let upvotes = post.upvotes;
+    let downvotes = post.downvotes;
+    if (oldVote === 1) upvotes = Math.max(0, upvotes - 1);
+    if (oldVote === -1) downvotes = Math.max(0, downvotes - 1);
+    if (vote === 1) upvotes += 1;
+    if (vote === -1) downvotes += 1;
+    await dbRun('UPDATE posts SET upvotes = ?, downvotes = ? WHERE id = ?', [upvotes, downvotes, postId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/community/replies/:id/vote', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+  const replyId = req.params.id;
+  const { vote } = req.body;
+  if (vote !== 1 && vote !== -1) {
+    return res.status(400).json({ error: 'Vote must be 1 or -1' });
+  }
+  try {
+    const voteId = req.session.userId + '_reply_' + replyId;
+    await dbRun(
+      'INSERT OR REPLACE INTO votes (id, user_id, target_type, target_id, vote, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [voteId, req.session.userId, 'reply', replyId, vote, new Date().toISOString()]
+    );
+    const reply = await dbGet('SELECT upvotes, downvotes FROM replies WHERE id = ?', [replyId]);
+    if (!reply) return res.status(404).json({ error: 'Not found' });
+    const oldVote = await getUserVote(req.session.userId, 'reply', replyId);
+    let upvotes = reply.upvotes;
+    let downvotes = reply.downvotes;
+    if (oldVote === 1) upvotes = Math.max(0, upvotes - 1);
+    if (oldVote === -1) downvotes = Math.max(0, downvotes - 1);
+    if (vote === 1) upvotes += 1;
+    if (vote === -1) downvotes += 1;
+    await dbRun('UPDATE replies SET upvotes = ?, downvotes = ? WHERE id = ?', [upvotes, downvotes, replyId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Admin: Content Management - Posts
+app.delete('/api/admin/posts/:id', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const targetId = req.params.id;
+  try {
+    await dbRun('DELETE FROM replies WHERE post_id = ?', [targetId]);
+    await dbRun('DELETE FROM posts WHERE id = ?', [targetId]);
+    await dbRun('DELETE FROM votes WHERE target_type = \'post\' AND target_id = ?', [targetId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/admin/posts/:id', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const { title_en, title_vi, content_en, content_vi, category, upvotes, downvotes } = req.body;
+  const targetId = req.params.id;
+  try {
+    const existing = await dbGet('SELECT * FROM posts WHERE id = ?', [targetId]);
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+
+    const newTitleEn = title_en !== undefined ? title_en : existing.title_en;
+    const newTitleVi = title_vi !== undefined ? title_vi : existing.title_vi;
+    const newContentEn = content_en !== undefined ? content_en : existing.content_en;
+    const newContentVi = content_vi !== undefined ? content_vi : existing.content_vi;
+    const newCategory = category !== undefined ? category : existing.category;
+    const newUpvotes = upvotes !== undefined ? upvotes : existing.upvotes;
+    const newDownvotes = downvotes !== undefined ? downvotes : existing.downvotes;
+    const now = new Date().toISOString();
+
+    await dbRun(
+      'UPDATE posts SET title_en = ?, title_vi = ?, content_en = ?, content_vi = ?, category = ?, upvotes = ?, downvotes = ?, updated_at = ? WHERE id = ?',
+      [newTitleEn, newTitleVi, newContentEn, newContentVi, newCategory, newUpvotes, newDownvotes, now, targetId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/admin/announcements/:id', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const { title_en, title_vi, content_en, content_vi } = req.body;
+  const targetId = req.params.id;
+  try {
+    const existing = await dbGet('SELECT * FROM announcements WHERE id = ?', [targetId]);
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+
+    const newTitleEn = title_en !== undefined ? title_en : existing.title_en;
+    const newTitleVi = title_vi !== undefined ? title_vi : existing.title_vi;
+    const newContentEn = content_en !== undefined ? content_en : existing.content_en;
+    const newContentVi = content_vi !== undefined ? content_vi : existing.content_vi;
+
+    await dbRun(
+      'UPDATE announcements SET title_en = ?, title_vi = ?, content_en = ?, content_vi = ? WHERE id = ?',
+      [newTitleEn, newTitleVi, newContentEn, newContentVi, targetId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Auth: Change Password
+app.post('/api/auth/change-password', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+  const { old_password, new_password } = req.body;
+  if (!old_password || !new_password) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  try {
+    const userRow = await dbGet('SELECT password_hash FROM users WHERE id = ?', [req.session.userId]);
+    if (!userRow) return res.status(404).json({ error: 'User not found' });
+    const matched = await bcrypt.compare(old_password, userRow.password_hash);
+    if (!matched) {
+      return res.status(400).json({ error: 'Invalid old password' });
+    }
+    const newHash = await bcrypt.hash(new_password, 10);
+    await dbRun('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, req.session.userId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Reorder endpoints
+app.post('/api/admin/reorder/lessons', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids must be an array' });
+  try {
+    await dbRun('BEGIN TRANSACTION');
+    for (let i = 0; i < ids.length; i++) {
+      await dbRun('UPDATE lessons SET order_num = ? WHERE id = ?', [i + 1, ids[i]]);
+    }
+    await dbRun('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await dbRun('ROLLBACK');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/admin/reorder/bots', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids must be an array' });
+  try {
+    await dbRun('BEGIN TRANSACTION');
+    for (let i = 0; i < ids.length; i++) {
+      await dbRun('UPDATE bots SET order_num = ? WHERE id = ?', [i + 1, ids[i]]);
+    }
+    await dbRun('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await dbRun('ROLLBACK');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/admin/reorder/topics', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids must be an array' });
+  try {
+    await dbRun('BEGIN TRANSACTION');
+    for (let i = 0; i < ids.length; i++) {
+      await dbRun('UPDATE topics SET order_num = ? WHERE id = ?', [i + 1, ids[i]]);
+    }
+    await dbRun('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await dbRun('ROLLBACK');
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete User
+app.delete('/api/admin/users/:id', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const targetId = req.params.id;
+  try {
+    const target = await dbGet('SELECT role FROM users WHERE id = ?', [targetId]);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    if (target.role === 'head_admin') {
+      return res.status(403).json({ error: 'Cannot delete head_admin' });
+    }
+    if (targetId === req.session.userId) {
+      return res.status(403).json({ error: 'Cannot delete yourself' });
+    }
+    await dbRun('DELETE FROM users WHERE id = ?', [targetId]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });

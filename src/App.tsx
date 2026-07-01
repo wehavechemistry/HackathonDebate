@@ -14,6 +14,8 @@ import Topics from './pages/Topics';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Admin from './pages/Admin';
+import Community from './pages/Community';
+import Announcements from './pages/Announcements';
 
 export default function App() {
   const { theme, initApp, isLoading } = useStore();
@@ -55,6 +57,8 @@ export default function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/community" element={<Community />} />
+            <Route path="/announcements" element={<Announcements />} />
           </Routes>
         </main>
       </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shuffle, Play, Send, Lightbulb, Star, Clock, ChevronLeft, Trophy, Activity, CheckCircle2, Mic, MicOff } from 'lucide-react';
 import { useStore } from '../store';
@@ -301,6 +302,8 @@ function JudgmentScorecard({ judgmentText, language, onNewBattle }: JudgmentScor
 export default function Battle() {
   const { language, bots, motions, currentUser, aiConfigured, setBotStars, addActivity, incrementTrainingStat } = useStore();
 
+  if (!currentUser) return <Navigate to="/login" />;
+
   const [phase, setPhase] = useState<'setup' | 'prep' | 'debate' | 'judging' | 'finished'>('setup');
   const [selectedBot, setSelectedBot] = useState<BotPersonality | null>(null);
   const [isCustomEngine, setIsCustomEngine] = useState(false);
@@ -326,6 +329,11 @@ export default function Battle() {
   const [interimTranscript, setInterimTranscript] = useState('');
   const [judgment, setJudgment] = useState('');
   const [currentTurn, setCurrentTurn] = useState<'user' | 'ai'>('user');
+  const [useCustomMotion, setUseCustomMotion] = useState(false);
+  const [customMotionEn, setCustomMotionEn] = useState('');
+  const [customMotionVi, setCustomMotionVi] = useState('');
+  const [enableTimer, setEnableTimer] = useState(false);
+  const [notesMd, setNotesMd] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -357,8 +365,10 @@ export default function Battle() {
   }, [difficulty, category, motions]);
 
   useEffect(() => {
-    randomizeMotion();
-  }, [difficulty, category, randomizeMotion]);
+    if (!useCustomMotion) {
+      randomizeMotion();
+    }
+  }, [difficulty, category, useCustomMotion, randomizeMotion]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -377,7 +387,21 @@ export default function Battle() {
       }, 1000);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [timerRunning, timeRemaining]);
+  }, [timerRunning, timeRemaining, enableTimer]);
+
+  useEffect(() => {
+    if (!enableTimer || !timerRunning || timeRemaining > 0) return;
+    if (currentTurn !== 'user' || isLoading) return;
+    const timeout = setTimeout(() => {
+      const text = inputText.trim();
+      if (text) {
+        submitSpeechRef.current();
+      } else {
+        setTimerRunning(false);
+      }
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [timeRemaining, timerRunning, enableTimer, currentTurn, isLoading, inputText]);
 
   useEffect(() => {
     return () => recognitionRef.current?.abort();
@@ -397,6 +421,9 @@ export default function Battle() {
     if (isListening) {
       recognitionRef.current?.stop();
     } else {
+      if (enableTimer && !timerRunning && timeRemaining > 0) {
+        setTimerRunning(true);
+      }
       const recognition = new SpeechRecognition();
       recognition.lang = localeMap[debateLang] || 'en-US';
       recognition.continuous = true;
@@ -445,12 +472,26 @@ export default function Battle() {
   };
 
   const startDebate = async () => {
-    if (!motion_) return;
+    let activeMotion = motion_;
+    if (useCustomMotion && customMotionEn) {
+      activeMotion = {
+        id: 'custom_' + Date.now(),
+        motion_en: customMotionEn,
+        motion_vi: customMotionVi || customMotionEn,
+        difficulty: difficulty,
+        category: 'custom'
+      } as DebateMotion;
+      setMotion(activeMotion);
+    }
+    if (!activeMotion) return;
     setPhase('debate');
     setRound(1);
     setMessages([]);
+    setNotes('');
+    setNotesMd(false);
     setHintsUsed(0);
     setTimeRemaining(speechTime * 60);
+    setTimerRunning(false);
 
     if (speakerOrder === '2nd') {
       setCurrentTurn('ai');
@@ -459,7 +500,7 @@ export default function Battle() {
         isCustomEngine ? null : selectedBot,
         customStrength,
         debateLang,
-        debateLang === 'vi' ? motion_.motion_vi : motion_.motion_en,
+        debateLang === 'vi' ? activeMotion.motion_vi : activeMotion.motion_en,
         side,
         speakerOrder,
         isCustomEngine,
@@ -518,6 +559,9 @@ export default function Battle() {
     setCurrentTurn('user');
     setTimeRemaining(speechTime * 60);
   };
+
+  const submitSpeechRef = useRef(submitSpeech);
+  submitSpeechRef.current = submitSpeech;
 
   const requestHint = async () => {
     if (!motion_ || hintsUsed >= MAX_HINTS) return;
@@ -663,8 +707,65 @@ export default function Battle() {
             </motion.div>
           )}
 
+          {/* Motion Source */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-400 mb-2">{t('battle.motion_source', language) || 'Motion Source'}</label>
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={() => setUseCustomMotion(false)}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${!useCustomMotion ? 'bg-white/10 text-white shadow-lg shadow-black/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+              >
+                {language === 'vi' ? 'Chủ đề ngẫu nhiên' : 'Random Topic'}
+              </button>
+              <button
+                onClick={() => setUseCustomMotion(true)}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${useCustomMotion ? 'bg-white/10 text-white shadow-lg shadow-black/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+              >
+                {language === 'vi' ? 'Nhập đề bài' : 'Custom Motion'}
+              </button>
+            </div>
+
+            {useCustomMotion && (
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={customMotionEn}
+                  onChange={e => setCustomMotionEn(e.target.value)}
+                  placeholder={language === 'vi' ? 'Nhập đề bài (Tiếng Anh)' : 'Enter motion (English)'}
+                  className="w-full px-4 py-2.5 bg-slate-900/50 border border-white/[0.06] rounded-xl text-white text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                />
+                <input
+                  type="text"
+                  value={customMotionVi}
+                  onChange={e => setCustomMotionVi(e.target.value)}
+                  placeholder={language === 'vi' ? 'Nhập đề bài (Tiếng Việt) - tùy chọn' : 'Enter motion (Vietnamese) - optional'}
+                  className="w-full px-4 py-2.5 bg-slate-900/50 border border-white/[0.06] rounded-xl text-white text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Timer Toggle */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-400 mb-2">{t('battle.timer', language) || 'Timer'}</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setEnableTimer(false)}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${!enableTimer ? 'bg-white/10 text-white shadow-lg shadow-black/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+              >
+                {language === 'vi' ? 'Tắt' : 'Off'}
+              </button>
+              <button
+                onClick={() => setEnableTimer(true)}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${enableTimer ? 'bg-white/10 text-white shadow-lg shadow-black/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+              >
+                {language === 'vi' ? 'Bật' : 'On'}
+              </button>
+            </div>
+          </div>
+
           {/* Motion Settings */}
-          <div className="grid sm:grid-cols-2 gap-6 mb-8">
+          <div className={`grid sm:grid-cols-2 gap-6 mb-8 ${useCustomMotion ? 'opacity-50 pointer-events-none' : ''}`}>
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-3">{t('battle.difficulty', language)}</label>
               <div className="flex gap-2 p-1 bg-slate-900/40 border border-white/[0.08] rounded-xl">
@@ -804,7 +905,7 @@ export default function Battle() {
 
           <button
             onClick={startDebate}
-            disabled={!motion_ || (!selectedBot && !isCustomEngine) || !aiConfigured}
+            disabled={(!useCustomMotion && !motion_) || (useCustomMotion && !customMotionEn) || (!selectedBot && !isCustomEngine) || !aiConfigured}
             className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-2xl transition-all hover:scale-[1.01] shadow-lg shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed animate-pulse-glow"
           >
             <Play size={18} className="inline mr-2" />
@@ -863,13 +964,25 @@ export default function Battle() {
           {phase === 'debate' && (
             <>
               <div className="h-4 w-px bg-slate-200 dark:bg-slate-800" />
-              <span className={`flex items-center gap-1.5 font-mono font-bold px-2 py-1 rounded-md ${
-                timeRemaining <= 30 
-                  ? 'bg-red-500/10 text-red-600 dark:text-red-400 animate-pulse' 
-                  : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
-              }`}>
-                <Clock size={15} /> {formatTime(timeRemaining)}
-              </span>
+              <div className="flex flex-col gap-1 min-w-[70px]">
+                <span className={`flex items-center justify-between gap-2 font-mono font-bold text-xs px-2 py-1 rounded-md ${
+                  timeRemaining <= 30 
+                    ? 'bg-red-500/10 text-red-600 dark:text-red-400 animate-pulse' 
+                    : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                }`}>
+                  <Clock size={13} /> {formatTime(timeRemaining)}
+                </span>
+                {enableTimer && (
+                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-1000 ${
+                        (speechTime * 60) > 0 ? (timeRemaining / (speechTime * 60)) < 0.3 ? 'bg-red-500' : 'bg-orange-500' : 'bg-orange-500'
+                      }`}
+                      style={{ width: `${((speechTime * 60) > 0 ? (timeRemaining / (speechTime * 60)) * 100 : 0)}%` }}
+                    />
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -882,14 +995,28 @@ export default function Battle() {
           <div className="flex-1 bg-white/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 flex flex-col min-h-0 shadow-sm">
             <div className="flex items-center justify-between mb-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
               <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">{t('battle.notes', language)}</h3>
-              <span className="text-[10px] text-slate-400 dark:text-slate-500">{notes.length} chars</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500">{notes.length} chars</span>
+                <button
+                  onClick={() => setNotesMd(!notesMd)}
+                  className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
+                >
+                  {notesMd ? (language === 'vi' ? 'Sơ' : 'Raw') : (language === 'vi' ? 'MD' : 'MD')}
+                </button>
+              </div>
             </div>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              className="flex-1 bg-transparent text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 resize-none focus:outline-none scrollbar-thin"
-              placeholder={language === 'vi' ? 'Ghi chú luận điểm tranh biện của bạn tại đây...' : 'Jot down your debate points or arguments here...'}
-            />
+            {notesMd ? (
+              <div className="flex-1 overflow-y-auto scrollbar-thin text-sm text-slate-800 dark:text-slate-200 prose prose-slate dark:prose-invert max-w-none">
+                <MarkdownRenderer content={notes || (language === 'vi' ? '*Chưa có ghi chú*' : '*No notes yet*')} />
+              </div>
+            ) : (
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                className="flex-1 bg-transparent text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 resize-none focus:outline-none scrollbar-thin"
+                placeholder={language === 'vi' ? 'Ghi chú luận điểm tranh biện của bạn tại đây...' : 'Jot down your debate points or arguments here...'}
+              />
+            )}
           </div>
         </div>
 
@@ -1011,7 +1138,12 @@ export default function Battle() {
               <div className="flex gap-2">
                 <textarea
                   value={inputText}
-                  onChange={e => setInputText(e.target.value)}
+                  onChange={e => {
+                    setInputText(e.target.value);
+                    if (enableTimer && !timerRunning && timeRemaining > 0 && currentTurn === 'user' && !isLoading) {
+                      setTimerRunning(true);
+                    }
+                  }}
                   placeholder={currentTurn === 'user'
                     ? (language === 'vi' ? 'Nhập phát biểu của bạn tại đây...' : 'Type your speech here...')
                     : (language === 'vi' ? 'Đang chờ bài nói của đối thủ AI...' : 'Waiting for AI opponent to speak...')}
