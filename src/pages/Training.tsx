@@ -5,23 +5,17 @@ import { Shuffle, Send, ArrowRight, Award, Flame, Zap } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import {
-  callOpenRouter,
+  callOpenRouterWithRetry,
   buildRebuttalPracticePrompt,
   buildSpeechPracticePrompt,
   buildPOIPracticePrompt,
-  buildKeywordBattlePrompt,
-  buildFallacyGenPrompt,
-  buildFallacySpottingPrompt,
-  buildWeighingGenPrompt,
-  buildWeighingPracticePrompt,
-  buildCaseBuildingPrompt,
   buildFramingPracticePrompt,
 } from '../api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import CoachCrab from '../components/CoachCrab';
 import type { DebateMotion } from '../types';
 
-type Mode = 'menu' | 'rebuttal' | 'speech' | 'poi' | 'keyword' | 'fallacy' | 'weighing' | 'case' | 'framing';
+type Mode = 'menu' | 'rebuttal' | 'speech' | 'poi' | 'framing';
 
 export default function Training() {
   const store = useStore();
@@ -46,8 +40,7 @@ export default function Training() {
   const categories = ['random', 'education', 'technology', 'environment', 'economics', 'politics', 'society', 'media', 'culture'];
   const debateLang = language;
 
-  // Modes that don't require an AI-generated reference text before the user types
-  const motionOnlyModes: Mode[] = ['keyword', 'speech', 'case', 'framing'];
+  const motionOnlyModes: Mode[] = ['speech', 'framing'];
 
   const randomizeMotion = () => {
     let filtered = motions.filter(m => m.difficulty === difficulty);
@@ -67,7 +60,7 @@ export default function Training() {
     const prompt = debateLang === 'vi'
       ? 'Tao mot luan diem NGAN GON (50-100 tu) ung ho de bai sau. Chi viet luan diem, khong them gi khac.'
       : 'Generate a BRIEF argument (50-100 words) supporting the following motion. Only the argument, nothing else.';
-    const result = await callOpenRouter([
+    const result = await callOpenRouterWithRetry([
       { role: 'system', content: prompt },
       { role: 'user', content: motionText },
     ]);
@@ -84,36 +77,8 @@ export default function Training() {
     const prompt = debateLang === 'vi'
       ? 'Tao mot luan diem NGAN GON (30-60 tu) ve de bai nay. Chi viet luan diem.'
       : 'Generate a SHORT argument (30-60 words) about this motion. Only the argument.';
-    const result = await callOpenRouter([
+    const result = await callOpenRouterWithRetry([
       { role: 'system', content: prompt },
-      { role: 'user', content: motionText },
-    ]);
-    setGeneratedArg(result);
-    setIsLoading(false);
-  };
-
-  const generateFallacyArgument = async () => {
-    const motion = randomizeMotion();
-    if (!motion) return;
-    setIsLoading(true);
-    setStep('input');
-    const motionText = debateLang === 'vi' ? motion.motion_vi : motion.motion_en;
-    const result = await callOpenRouter([
-      { role: 'system', content: buildFallacyGenPrompt(debateLang) },
-      { role: 'user', content: motionText },
-    ]);
-    setGeneratedArg(result);
-    setIsLoading(false);
-  };
-
-  const generateWeighingArguments = async () => {
-    const motion = randomizeMotion();
-    if (!motion) return;
-    setIsLoading(true);
-    setStep('input');
-    const motionText = debateLang === 'vi' ? motion.motion_vi : motion.motion_en;
-    const result = await callOpenRouter([
-      { role: 'system', content: buildWeighingGenPrompt(debateLang) },
       { role: 'user', content: motionText },
     ]);
     setGeneratedArg(result);
@@ -124,7 +89,7 @@ export default function Training() {
     if (!userInput.trim()) return;
     setIsLoading(true);
     const prompt = buildRebuttalPracticePrompt(debateLang);
-    const result = await callOpenRouter([
+    const result = await callOpenRouterWithRetry([
       { role: 'system', content: prompt },
       { role: 'user', content: `Original argument:\n${generatedArg}\n\nUser's rebuttal:\n${userInput}` },
     ]);
@@ -142,7 +107,7 @@ export default function Training() {
     const motionText = selectedMotion ? (debateLang === 'vi' ? selectedMotion.motion_vi : selectedMotion.motion_en) : '';
     const sideLabel = side === 'for' ? t('battle.for', language) : t('battle.against', language);
     const prompt = buildSpeechPracticePrompt(debateLang);
-    const result = await callOpenRouter([
+    const result = await callOpenRouterWithRetry([
       { role: 'system', content: prompt },
       { role: 'user', content: `Motion: "${motionText}"\nSide: ${sideLabel}\n\nUser's speech:\n${userInput}` },
     ]);
@@ -158,7 +123,7 @@ export default function Training() {
     if (!userInput.trim()) return;
     setIsLoading(true);
     const prompt = buildPOIPracticePrompt(debateLang);
-    const result = await callOpenRouter([
+    const result = await callOpenRouterWithRetry([
       { role: 'system', content: prompt },
       { role: 'user', content: `Original argument:\n${generatedArg}\n\nUser's POI:\n${userInput}` },
     ]);
@@ -170,80 +135,13 @@ export default function Training() {
     addActivity({ type: 'training', title: language === 'vi' ? 'Luy\u1ec7n POI' : 'POI Practice' });
   };
 
-  const submitKeywords = async () => {
-    if (!userInput.trim()) return;
-    setIsLoading(true);
-    const motionText = selectedMotion ? (debateLang === 'vi' ? selectedMotion.motion_vi : selectedMotion.motion_en) : '';
-    const prompt = buildKeywordBattlePrompt(debateLang);
-    const result = await callOpenRouter([
-      { role: 'system', content: prompt },
-      { role: 'user', content: `Motion: ${motionText}\n\n5 keywords: ${userInput}` },
-    ]);
-    setFeedback(result);
-    setStep('feedback');
-    setIsLoading(false);
-    incrementTrainingStat('keywordBattles');
-    await addTrainingScore('keywordBattles', 15);
-    addActivity({ type: 'training', title: language === 'vi' ? 'Tr\u1eadn t\u1eeb kh\u00f3a' : 'Keyword Battle' });
-  };
-
-  const submitFallacy = async () => {
-    if (!userInput.trim()) return;
-    setIsLoading(true);
-    const prompt = buildFallacySpottingPrompt(debateLang);
-    const result = await callOpenRouter([
-      { role: 'system', content: prompt },
-      { role: 'user', content: `Argument:\n${generatedArg}\n\nUser's fallacy identification:\n${userInput}` },
-    ]);
-    setFeedback(result);
-    setStep('feedback');
-    setIsLoading(false);
-    incrementTrainingStat('fallacySpotting');
-    await addTrainingScore('fallacySpotting', 25);
-    addActivity({ type: 'training', title: language === 'vi' ? 'Soi l\u1ed7i logic' : 'Fallacy Spotting' });
-  };
-
-  const submitWeighing = async () => {
-    if (!userInput.trim()) return;
-    setIsLoading(true);
-    const prompt = buildWeighingPracticePrompt(debateLang);
-    const result = await callOpenRouter([
-      { role: 'system', content: prompt },
-      { role: 'user', content: `Competing arguments:\n${generatedArg}\n\nUser's weighing analysis:\n${userInput}` },
-    ]);
-    setFeedback(result);
-    setStep('feedback');
-    setIsLoading(false);
-    incrementTrainingStat('weighing');
-    await addTrainingScore('weighing', 25);
-    addActivity({ type: 'training', title: language === 'vi' ? 'Luy\u1ec7n c\u00e2n nh\u1eafc so s\u00e1nh' : 'Weighing Practice' });
-  };
-
-  const submitCase = async () => {
-    if (!userInput.trim()) return;
-    setIsLoading(true);
-    const motionText = selectedMotion ? (debateLang === 'vi' ? selectedMotion.motion_vi : selectedMotion.motion_en) : '';
-    const sideLabel = side === 'for' ? t('battle.for', language) : t('battle.against', language);
-    const prompt = buildCaseBuildingPrompt(debateLang);
-    const result = await callOpenRouter([
-      { role: 'system', content: prompt },
-      { role: 'user', content: `Motion: "${motionText}"\nPosition: ${sideLabel}\n\nUser's case:\n${userInput}` },
-    ]);
-    setFeedback(result);
-    setStep('feedback');
-    setIsLoading(false);
-    incrementTrainingStat('caseBuilding');
-    await addTrainingScore('caseBuilding', 35);
-    addActivity({ type: 'training', title: language === 'vi' ? 'X\u00e2y d\u1ef1ng h\u1ec7 th\u1ed1ng lu\u1eadn \u0111i\u1ec3m' : 'Case Building' });
-  };
-
   const submitFraming = async () => {
     if (!userInput.trim()) return;
     setIsLoading(true);
     const motionText = selectedMotion ? (debateLang === 'vi' ? selectedMotion.motion_vi : selectedMotion.motion_en) : '';
     const sideLabel = side === 'for' ? t('battle.for', language) : t('battle.against', language);
     const prompt = buildFramingPracticePrompt(debateLang);
-    const result = await callOpenRouter([
+    const result = await callOpenRouterWithRetry([
       { role: 'system', content: prompt },
       { role: 'user', content: `Motion: "${motionText}"\nSide: ${sideLabel}\n\nUser's framing:\n${userInput}` },
     ]);
@@ -267,10 +165,6 @@ export default function Training() {
       { key: 'rebuttal', title: t('training.rebuttal', language), desc: t('training.rebuttal.desc', language), color: 'from-red-500 to-orange-500' },
       { key: 'speech', title: t('training.speech', language), desc: t('training.speech.desc', language), color: 'from-blue-500 to-cyan-500' },
       { key: 'poi', title: t('training.poi', language), desc: t('training.poi.desc', language), color: 'from-green-500 to-emerald-500' },
-      { key: 'keyword', title: t('training.keyword', language), desc: t('training.keyword.desc', language), color: 'from-purple-500 to-pink-500' },
-      { key: 'fallacy', title: t('training.fallacy', language), desc: t('training.fallacy.desc', language), color: 'from-yellow-500 to-orange-600' },
-      { key: 'weighing', title: t('training.weighing', language), desc: t('training.weighing.desc', language), color: 'from-teal-500 to-cyan-600' },
-      { key: 'case', title: t('training.case', language), desc: t('training.case.desc', language), color: 'from-indigo-500 to-purple-600' },
       { key: 'framing', title: t('training.framing', language), desc: t('training.framing.desc', language), color: 'from-pink-500 to-rose-600' },
     ];
 
@@ -290,7 +184,6 @@ export default function Training() {
           <h1 className="text-3xl font-bold text-white tracking-tight">{t('training.title', language)}</h1>
         </div>
 
-        {/* XP / Tier / Streak bar */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/40">
             <div className="flex items-center gap-1.5 mb-1">
@@ -343,33 +236,17 @@ export default function Training() {
   const modeLabel = mode === 'rebuttal' ? t('training.rebuttal', language)
     : mode === 'speech' ? t('training.speech', language)
     : mode === 'poi' ? t('training.poi', language)
-    : mode === 'keyword' ? t('training.keyword', language)
-    : mode === 'fallacy' ? t('training.fallacy', language)
-    : mode === 'weighing' ? t('training.weighing', language)
-    : mode === 'case' ? t('training.case', language)
     : t('training.framing', language);
 
-  const showsGeneratedArg = generatedArg && (mode === 'rebuttal' || mode === 'poi' || mode === 'fallacy' || mode === 'weighing');
-  const generatedArgLabel = mode === 'fallacy'
-    ? (language === 'vi' ? 'Lu\u1eadn \u0111i\u1ec3m c\u1ea7n soi l\u1ed7i:' : 'Argument to inspect:')
-    : mode === 'weighing'
-    ? (language === 'vi' ? 'Hai lu\u1eadn \u0111i\u1ec3m \u0111\u1ed1i l\u1eadp:' : 'Competing arguments:')
-    : (language === 'vi' ? 'Lu\u1eadn \u0111i\u1ec3m c\u1ee7a \u0111\u1ed1i th\u1ee7:' : 'Opponent\'s argument:');
+  const showsGeneratedArg = generatedArg && (mode === 'rebuttal' || mode === 'poi');
+  const generatedArgLabel = language === 'vi' ? 'Lu\u1eadn \u0111i\u1ec3m c\u1ee7a \u0111\u1ed1i th\u1ee7:' : 'Opponent\'s argument:';
 
-  const inputLabel = mode === 'keyword'
-    ? (language === 'vi' ? 'Nh\u1eadp 5 t\u1eeb kh\u00f3a (c\u00e1ch nhau b\u1eb1ng d\u1ea5u ph\u1ea9y):' : 'Enter 5 keywords (comma separated):')
-    : mode === 'poi'
+  const inputLabel = mode === 'poi'
     ? (language === 'vi' ? 'Vi\u1ebft POI c\u1ee7a b\u1ea1n:' : 'Write your POI:')
     : mode === 'rebuttal'
     ? (language === 'vi' ? 'Vi\u1ebft ph\u1ea3n bi\u1ec7n c\u1ee7a b\u1ea1n:' : 'Write your rebuttal:')
     : mode === 'speech'
     ? (language === 'vi' ? 'Vi\u1ebft b\u00e0i ph\u00e1t bi\u1ec3u c\u1ee7a b\u1ea1n:' : 'Write your speech:')
-    : mode === 'fallacy'
-    ? (language === 'vi' ? 'X\u00e1c \u0111\u1ecbnh v\u00e0 gi\u1ea3i th\u00edch l\u1ed7i ngu\u1ef5 bi\u1ec7n:' : 'Identify and explain the fallacy:')
-    : mode === 'weighing'
-    ? (language === 'vi' ? 'Vi\u1ebft ph\u00e2n t\u00edch c\u00e2n nh\u1eafc so s\u00e1nh:' : 'Write your weighing analysis:')
-    : mode === 'case'
-    ? (language === 'vi' ? 'Vi\u1ebft h\u1ec7 th\u1ed1ng lu\u1eadn \u0111i\u1ec3m \u0111\u1ea7y \u0111\u1ee7:' : 'Write your full case:')
     : (language === 'vi' ? 'Vi\u1ebft \u0111o\u1ea1n khung l\u1eadp lu\u1eadn:' : 'Write your framing paragraph:');
 
   return (
@@ -389,7 +266,6 @@ export default function Training() {
         </div>
       )}
 
-      {/* Motion / position settings */}
       {step === 'generate' && (
         <div className="space-y-4 mb-6">
           <div className="grid sm:grid-cols-2 gap-4">
@@ -415,7 +291,7 @@ export default function Training() {
             </div>
           </div>
 
-          {(mode === 'case' || mode === 'speech' || mode === 'framing') && (
+          {(mode === 'speech' || mode === 'framing') && (
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-2">{t('battle.side', language)}</label>
               <div className="flex gap-2">
@@ -433,8 +309,6 @@ export default function Training() {
             onClick={() => {
               if (!aiConfigured) return;
               if (mode === 'poi') generatePOIArgument();
-              else if (mode === 'fallacy') generateFallacyArgument();
-              else if (mode === 'weighing') generateWeighingArguments();
               else if (motionOnlyModes.includes(mode)) {
                 const m = randomizeMotion();
                 if (m) { setStep('input'); }
@@ -450,21 +324,18 @@ export default function Training() {
         </div>
       )}
 
-      {/* Input Step */}
       {step === 'input' && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-          {/* Display motion */}
           {selectedMotion && (
             <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-700/50">
               <p className="text-xs text-slate-400 mb-1">{t('battle.motion', language)}</p>
               <p className="text-white font-medium">{debateLang === 'vi' ? selectedMotion.motion_vi : selectedMotion.motion_en}</p>
-              {(mode === 'case' || mode === 'speech' || mode === 'framing') && (
+              {(mode === 'speech' || mode === 'framing') && (
                 <p className="text-xs text-orange-400 mt-2">{t('battle.side', language)}: {side === 'for' ? t('battle.for', language) : t('battle.against', language)}</p>
               )}
             </div>
           )}
 
-          {/* Generated argument (for rebuttal/poi/fallacy/weighing) */}
           {showsGeneratedArg && (
             <div className="p-4 rounded-xl bg-slate-700/20 border border-slate-600/30">
               <p className="text-xs text-orange-400 mb-2">{generatedArgLabel}</p>
@@ -487,8 +358,8 @@ export default function Training() {
                   value={userInput}
                   onChange={e => setUserInput(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-                  rows={mode === 'keyword' || mode === 'poi' ? 3 : mode === 'case' ? 10 : 6}
-                  placeholder={mode === 'keyword' ? 'economy, growth, poverty, jobs, tax' : ''}
+                  rows={mode === 'poi' ? 3 : 6}
+                  placeholder=""
                 />
               </div>
 
@@ -497,10 +368,6 @@ export default function Training() {
                   if (mode === 'rebuttal') submitRebuttal();
                   else if (mode === 'speech') submitSpeech();
                   else if (mode === 'poi') submitPOI();
-                  else if (mode === 'keyword') submitKeywords();
-                  else if (mode === 'fallacy') submitFallacy();
-                  else if (mode === 'weighing') submitWeighing();
-                  else if (mode === 'case') submitCase();
                   else submitFraming();
                 }}
                 disabled={!userInput.trim()}
@@ -514,7 +381,6 @@ export default function Training() {
         </motion.div>
       )}
 
-      {/* Feedback Step */}
       {step === 'feedback' && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
           <div className="p-5 rounded-xl bg-slate-800/30 border border-slate-700/50">

@@ -157,7 +157,9 @@ async function migrateDatabase() {
     `ALTER TABLE users ADD COLUMN tier TEXT NOT NULL DEFAULT 'bronze'`,
     `ALTER TABLE users ADD COLUMN unlockedLessonIds TEXT NOT NULL DEFAULT '[]'`,
     `ALTER TABLE topics ADD COLUMN order_num INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE topics ADD COLUMN image_id TEXT DEFAULT NULL`,
     `ALTER TABLE bots ADD COLUMN order_num INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bots ADD COLUMN avatar_url TEXT DEFAULT NULL`,
   ];
   for (const sql of migrations) {
     try {
@@ -233,7 +235,8 @@ async function initializeDatabase() {
       rebuttal INTEGER NOT NULL,
       vocabulary INTEGER NOT NULL,
       creativity INTEGER NOT NULL,
-      confidence INTEGER NOT NULL
+      confidence INTEGER NOT NULL,
+      avatar_url TEXT DEFAULT NULL
     )
   `);
 
@@ -260,6 +263,16 @@ async function initializeDatabase() {
       model TEXT NOT NULL DEFAULT 'openrouter/auto',
       priority INTEGER NOT NULL DEFAULT 0,
       enabled INTEGER NOT NULL DEFAULT 1
+    )
+  `);
+
+  await dbRun(`
+    CREATE TABLE IF NOT EXISTS ai_prompts (
+      id TEXT PRIMARY KEY,
+      key TEXT UNIQUE NOT NULL,
+      content_en TEXT NOT NULL,
+      content_vi TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     )
   `);
 
@@ -453,22 +466,22 @@ async function seedDatabase() {
   if (topicCount.count === 0) {
     console.log('Seeding default topics...');
     const defaultTopics = [
-      { id: 't_edu_1', category: 'education', title_en: 'Education Reform', title_vi: 'Cải cách giáo dục', content_en: '# Education Reform\n\nKey debates in education include standardized testing, curriculum design, and access to quality education.\n\n## Key Arguments\n\n- Equal access vs. merit-based systems\n- Traditional vs. progressive teaching methods\n- Role of technology in education', content_vi: '# Cải Cách Giáo Dục\n\nCác tranh luận chính trong giáo dục bao gồm thi chuẩn hóa, thiết kế chương trình và tiếp cận giáo dục chất lượng.\n\n## Luận Điểm Chính\n\n- Bình đẳng vs. hệ thống dựa trên năng lực\n- Phương pháp giảng dạy truyền thống vs. tiến bộ\n- Vai trò của công nghệ trong giáo dục' },
-      { id: 't_tech_1', category: 'technology', title_en: 'Artificial Intelligence', title_vi: 'Trí tuệ nhân tạo', content_en: '# Artificial Intelligence\n\nAI raises profound questions about automation, privacy, and the future of work.\n\n## Key Areas\n\n- Job displacement vs. creation\n- AI regulation\n- Ethical AI development', content_vi: '# Trí Tuệ Nhân Tạo\n\nAI đặt ra nhiều câu hỏi sâu sắc về tự động hóa, quyền riêng tư và tương lai việc làm.\n\n## Lĩnh Vực Chính\n\n- Mất việc vs. tạo việc\n- Quản lý AI\n- Phát triển AI có đạo đức' },
-      { id: 't_env_1', category: 'environment', title_en: 'Climate Change Policy', title_vi: 'Chính sách biến đổi khí hậu', content_en: '# Climate Change Policy\n\nDebates around how to address climate change involve economic trade-offs and international cooperation.\n\n## Key Topics\n\n- Carbon taxes vs. cap-and-trade\n- Renewable energy transition\n- Climate justice', content_vi: '# Chính Sách Biến Đổi Khí Hậu\n\nTranh luận về cách giải quyết biến đổi khí hậu liên quan đến đánh đổi kinh tế và hợp tác quốc tế.\n\n## Chủ Đề Chính\n\n- Thuế carbon vs. mua bán quyền phát thải\n- Chuyển đổi năng lượng tái tạo\n- Công bằng khí hậu' },
-      { id: 't_eco_1', category: 'economics', title_en: 'Universal Basic Income', title_vi: 'Thu nhập cơ bản phổ thông', content_en: '# Universal Basic Income\n\nUBI proposes giving every citizen a regular cash payment regardless of employment.\n\n## Arguments For\n\n- Reduces poverty\n- Provides safety net\n- Enables entrepreneurship\n\n## Arguments Against\n\n- Cost concerns\n- Inflation risk\n- Work incentive reduction', content_vi: '# Thu Nhập Cơ Bản Phổ Thông\n\nUBI đề xuất cung cấp cho mọi công dân khoản tiền định kỳ bất kể việc làm.\n\n## Luận Điểm Ủng Hộ\n\n- Giảm nghèo\n- Cung cấp mạng lưới an sinh\n- Khuyến khích khởi nghiệp\n\n## Luận Điểm Phản Đối\n\n- Chi phí lớn\n- Nguy cơ lạm phát\n- Giảm động lực làm việc' },
-      { id: 't_pol_1', category: 'politics', title_en: 'Democracy vs Authoritarianism', title_vi: 'Dân chủ vs Độc tài', content_en: '# Democracy vs Authoritarianism\n\nA fundamental debate about governance systems.\n\n## Key Points\n\n- Individual freedoms\n- Economic efficiency\n- Stability vs. representation', content_vi: '# Dân Chủ vs Độc Tài\n\nTranh luận cơ bản về hệ thống quản trị.\n\n## Điểm Chính\n\n- Quyền tự do cá nhân\n- Hiệu quả kinh tế\n- Ổn định vs. đại diện' },
-      { id: 't_soc_1', category: 'society', title_en: 'Social Media Impact', title_vi: 'Tác động của mạng xã hội', content_en: '# Social Media Impact\n\nExploring the effects of social media on society, mental health, and democracy.\n\n## Topics\n\n- Mental health effects\n- Echo chambers\n- Free speech vs. moderation', content_vi: '# Tác Động Của Mạng Xã Hội\n\nKhám phá tác động của mạng xã hội lên xã hội, sức khỏe tâm thần và dân chủ.\n\n## Chủ Đề\n\n- Ảnh hưởng sức khỏe tâm thần\n- Buồng vang\n- Tự do ngôn luận vs. kiểm duyệt' },
-      { id: 't_med_1', category: 'media', title_en: 'Press Freedom', title_vi: 'Tự do báo chí', content_en: '# Press Freedom\n\nThe role of free press in democracy and its limits.\n\n## Key Debates\n\n- Government regulation\n- Fake news responsibility\n- Privacy vs. public interest', content_vi: '# Tự Do Báo Chí\n\nVai trò của báo chí tự do trong dân chủ và giới hạn.\n\n## Tranh Luận Chính\n\n- Quản lý của chính phủ\n- Trách nhiệm tin giả\n- Quyền riêng tư vs. lợi ích công' },
-      { id: 't_cul_1', category: 'culture', title_en: 'Cultural Preservation', title_vi: 'Bảo tồn văn hóa', content_en: '# Cultural Preservation\n\nBalancing modernization with protecting cultural heritage.\n\n## Topics\n\n- Globalization effects\n- Language preservation\n- Traditional vs. modern values', content_vi: '# Bảo Tồn Văn Hóa\n\nCân bằng hiện đại hóa với bảo vệ di sản văn hóa.\n\n## Chủ Đề\n\n- Tác động toàn cầu hóa\n- Bảo tồn ngôn ngữ\n- Giá trị truyền thống vs. hiện đại' },
-      { id: 't_misc_1', category: 'misc', title_en: 'Space Exploration', title_vi: 'Khám phá không gian', content_en: '# Space Exploration\n\nShould we invest in space or focus on Earth?\n\n## Perspectives\n\n- Scientific advancement\n- Resource allocation\n- Future of humanity', content_vi: '# Khám Phá Không Gian\n\nNên đầu tư vào không gian hay tập trung vào Trái Đất?\n\n## Góc Nhìn\n\n- Tiến bộ khoa học\n- Phân bổ nguồn lực\n- Tương lai nhân loại' }
+      { id: 't_edu_1', category: 'education', image_id: 'education', title_en: 'Education Reform', title_vi: 'Cải cách giáo dục', content_en: '# Education Reform\n\nKey debates in education include standardized testing, curriculum design, and access to quality education.\n\n## Key Arguments\n\n- Equal access vs. merit-based systems\n- Traditional vs. progressive teaching methods\n- Role of technology in education', content_vi: '# Cải Cách Giáo Dục\n\nCác tranh luận chính trong giáo dục bao gồm thi chuẩn hóa, thiết kế chương trình và tiếp cận giáo dục chất lượng.\n\n## Luận Điểm Chính\n\n- Bình đẳng vs. hệ thống dựa trên năng lực\n- Phương pháp giảng dạy truyền thống vs. tiến bộ\n- Vai trò của công nghệ trong giáo dục' },
+      { id: 't_tech_1', category: 'technology', image_id: 'technology', title_en: 'Artificial Intelligence', title_vi: 'Trí tuệ nhân tạo', content_en: '# Artificial Intelligence\n\nAI raises profound questions about automation, privacy, and the future of work.\n\n## Key Areas\n\n- Job displacement vs. creation\n- AI regulation\n- Ethical AI development', content_vi: '# Trí Tuệ Nhân Tạo\n\nAI đặt ra nhiều câu hỏi sâu sắc về tự động hóa, quyền riêng tư và tương lai việc làm.\n\n## Lĩnh Vực Chính\n\n- Mất việc vs. tạo việc\n- Quản lý AI\n- Phát triển AI có đạo đức' },
+      { id: 't_env_1', category: 'environment', image_id: 'environment', title_en: 'Climate Change Policy', title_vi: 'Chính sách biến đổi khí hậu', content_en: '# Climate Change Policy\n\nDebates around how to address climate change involve economic trade-offs and international cooperation.\n\n## Key Topics\n\n- Carbon taxes vs. cap-and-trade\n- Renewable energy transition\n- Climate justice', content_vi: '# Chính Sách Biến Đổi Khí Hậu\n\nTranh luận về cách giải quyết biến đổi khí hậu liên quan đến đánh đổi kinh tế và hợp tác quốc tế.\n\n## Chủ Đề Chính\n\n- Thuế carbon vs. mua bán quyền phát thải\n- Chuyển đổi năng lượng tái tạo\n- Công bằng khí hậu' },
+      { id: 't_eco_1', category: 'economics', image_id: 'economics', title_en: 'Universal Basic Income', title_vi: 'Thu nhập cơ bản phổ thông', content_en: '# Universal Basic Income\n\nUBI proposes giving every citizen a regular cash payment regardless of employment.\n\n## Arguments For\n\n- Reduces poverty\n- Provides safety net\n- Enables entrepreneurship\n\n## Arguments Against\n\n- Cost concerns\n- Inflation risk\n- Work incentive reduction', content_vi: '# Thu Nhập Cơ Bản Phổ Thông\n\nUBI đề xuất cung cấp cho mọi công dân khoản tiền định kỳ bất kể việc làm.\n\n## Luận Điểm Ủng Hộ\n\n- Giảm nghèo\n- Cung cấp mạng lưới an sinh\n- Khuyến khích khởi nghiệp\n\n## Luận Điểm Phản Đối\n\n- Chi phí lớn\n- Nguy cơ lạm phát\n- Giảm động lực làm việc' },
+      { id: 't_pol_1', category: 'politics', image_id: 'politics', title_en: 'Democracy vs Authoritarianism', title_vi: 'Dân chủ vs Độc tài', content_en: '# Democracy vs Authoritarianism\n\nA fundamental debate about governance systems.\n\n## Key Points\n\n- Individual freedoms\n- Economic efficiency\n- Stability vs. representation', content_vi: '# Dân Chủ vs Độc Tài\n\nTranh luận cơ bản về hệ thống quản trị.\n\n## Điểm Chính\n\n- Quyền tự do cá nhân\n- Hiệu quả kinh tế\n- Ổn định vs. đại diện' },
+      { id: 't_soc_1', category: 'society', image_id: 'society', title_en: 'Social Media Impact', title_vi: 'Tác động của mạng xã hội', content_en: '# Social Media Impact\n\nExploring the effects of social media on society, mental health, and democracy.\n\n## Topics\n\n- Mental health effects\n- Echo chambers\n- Free speech vs. moderation', content_vi: '# Tác Động Của Mạng Xã Hội\n\nKhám phá tác động của mạng xã hội lên xã hội, sức khỏe tâm thần và dân chủ.\n\n## Chủ Đề\n\n- Ảnh hưởng sức khỏe tâm thần\n- Buồng vang\n- Tự do ngôn luận vs. kiểm duyệt' },
+      { id: 't_med_1', category: 'media', image_id: 'media', title_en: 'Press Freedom', title_vi: 'Tự do báo chí', content_en: '# Press Freedom\n\nThe role of free press in democracy and its limits.\n\n## Key Debates\n\n- Government regulation\n- Fake news responsibility\n- Privacy vs. public interest', content_vi: '# Tự Do Báo Chí\n\nVai trò của báo chí tự do trong dân chủ và giới hạn.\n\n## Tranh Luận Chính\n\n- Quản lý của chính phủ\n- Trách nhiệm tin giả\n- Quyền riêng tư vs. lợi ích công' },
+      { id: 't_cul_1', category: 'culture', image_id: 'culture', title_en: 'Cultural Preservation', title_vi: 'Bảo tồn văn hóa', content_en: '# Cultural Preservation\n\nBalancing modernization with protecting cultural heritage.\n\n## Topics\n\n- Globalization effects\n- Language preservation\n- Traditional vs. modern values', content_vi: '# Bảo Tồn Văn Hóa\n\nCân bằng hiện đại hóa với bảo vệ di sản văn hóa.\n\n## Chủ Đề\n\n- Tác động toàn cầu hóa\n- Bảo tồn ngôn ngữ\n- Giá trị truyền thống vs. hiện đại' },
+      { id: 't_misc_1', category: 'misc', image_id: 'misc', title_en: 'Space Exploration', title_vi: 'Khám phá không gian', content_en: '# Space Exploration\n\nShould we invest in space or focus on Earth?\n\n## Perspectives\n\n- Scientific advancement\n- Resource allocation\n- Future of humanity', content_vi: '# Khám Phá Không Gian\n\nNên đầu tư vào không gian hay tập trung vào Trái Đất?\n\n## Góc Nhìn\n\n- Tiến bộ khoa học\n- Phân bổ nguồn lực\n- Tương lai nhân loại' }
     ];
 
     for (const t of defaultTopics) {
       await dbRun(`
-        INSERT OR REPLACE INTO topics (id, category, title_en, title_vi, content_en, content_vi)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `, [t.id, t.category, t.title_en, t.title_vi, t.content_en, t.content_vi]);
+        INSERT OR REPLACE INTO topics (id, category, title_en, title_vi, content_en, content_vi, image_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [t.id, t.category, t.title_en, t.title_vi, t.content_en, t.content_vi, t.image_id]);
     }
   }
 
@@ -478,7 +491,7 @@ async function seedDatabase() {
     console.log('Seeding default bots...');
     const defaultBots = [
       {
-        id: 'duy', name: 'Duy', avatar: 'duy',
+        id: 'duy', name: 'Duy', avatar: 'duy', avatar_url: '/avatars/duy.png',
         bio_en: 'Just discovered debate. A coder who knows nothing outside of code. Talks a bit awkwardly but always tries to create a good match.',
         bio_vi: 'Mới biết đến debate, là coder nhưng không biết gì ngoài code và nói chuyện hơi ngụ nhưng anh ấy luôn cố để tạo ra một trận đấu hay.',
         displayStrength: 2,
@@ -486,7 +499,7 @@ async function seedDatabase() {
         knowledge: 2, logic: 3, rebuttal: 1, vocabulary: 2, creativity: 3, confidence: 2
       },
       {
-        id: 'thai', name: 'Thái', avatar: 'thai',
+        id: 'thai', name: 'Thái', avatar: 'thai', avatar_url: '/avatars/thai.png',
         bio_en: 'Learned debate for 1 week. A TikTok enthusiast with decent speaking skills. Likes to trash-talk, good at persuading and making things up.',
         bio_vi: 'Mới học được debate 1 tuần, một người thích xem TikTok, khả năng nói chuyện ổn, hay thích nói xấu, và khả năng thuyết phục, bịa chuyện tốt.',
         displayStrength: 5,
@@ -494,7 +507,7 @@ async function seedDatabase() {
         knowledge: 4, logic: 4, rebuttal: 5, vocabulary: 5, creativity: 6, confidence: 8
       },
       {
-        id: 'han', name: 'Hân', avatar: 'han',
+        id: 'han', name: 'Hân', avatar: 'han', avatar_url: '/avatars/han.png',
         bio_en: 'A girl Thái met 2 weeks ago. Born in 2014, very young but remarkably smart and creative.',
         bio_vi: 'Cô gái Thái quen được 2 tuần trước, 2014 nên còn rất trẻ nhưng rất thông minh và sáng tạo.',
         displayStrength: 3.5,
@@ -502,7 +515,7 @@ async function seedDatabase() {
         knowledge: 3, logic: 3, rebuttal: 3, vocabulary: 3, creativity: 7, confidence: 4
       },
       {
-        id: 'bach', name: 'Bách', avatar: 'bach',
+        id: 'bach', name: 'Bách', avatar: 'bach', avatar_url: '/avatars/bach.png',
         bio_en: 'Duy\'s newly programmed AI assistant. Originally coded for housework, but evolved far beyond thanks to Duy\'s WiFi. Social knowledge vastly surpasses expectations.',
         bio_vi: 'Con AI giúp việc mới được lập trình của Duy, mặc dù mới được code chức năng làm việc nhà nhờ WiFi nhà Duy nên Bách đã tiến hóa lên rất nhiều, và kiến thức xã hội vượt xa.',
         displayStrength: 6.5,
@@ -510,7 +523,7 @@ async function seedDatabase() {
         knowledge: 7, logic: 7, rebuttal: 6, vocabulary: 7, creativity: 5, confidence: 6
       },
       {
-        id: 'dung', name: 'Dũng', avatar: 'dung',
+        id: 'dung', name: 'Dũng', avatar: 'dung', avatar_url: '/avatars/dung.png',
         bio_en: 'The debate boss at school. Competed in many debates with lots of experience, but still has knowledge gaps in many social topics, often stuck for ideas.',
         bio_vi: 'Ông trùm debate trong trường, thi debate nhiều và nhiều kinh nghiệm, tuy nhiên vẫn có nhiều lỗ hổng kiến thức trong nhiều chủ đề xã hội nên hay bí ý tưởng.',
         displayStrength: 7,
@@ -518,7 +531,7 @@ async function seedDatabase() {
         knowledge: 6, logic: 8, rebuttal: 7, vocabulary: 7, creativity: 5, confidence: 8
       },
       {
-        id: 'tom', name: 'Tôm', avatar: 'tom',
+        id: 'tom', name: 'Tôm', avatar: 'tom', avatar_url: '/avatars/tom.png',
         bio_en: 'A shrimp, friend of Coach Crab.',
         bio_vi: 'Một con tôm bạn của Coach Crab.',
         displayStrength: 1,
@@ -529,9 +542,39 @@ async function seedDatabase() {
 
     for (const b of defaultBots) {
       await dbRun(`
-        INSERT OR REPLACE INTO bots (id, name, avatar, bio_en, bio_vi, displayStrength, hiddenPrompt, knowledge, logic, rebuttal, vocabulary, creativity, confidence)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [b.id, b.name, b.avatar, b.bio_en, b.bio_vi, b.displayStrength, b.hiddenPrompt, b.knowledge, b.logic, b.rebuttal, b.vocabulary, b.creativity, b.confidence]);
+        INSERT OR REPLACE INTO bots (id, name, avatar, avatar_url, bio_en, bio_vi, displayStrength, hiddenPrompt, knowledge, logic, rebuttal, vocabulary, creativity, confidence)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [b.id, b.name, b.avatar, b.avatar_url, b.bio_en, b.bio_vi, b.displayStrength, b.hiddenPrompt, b.knowledge, b.logic, b.rebuttal, b.vocabulary, b.creativity, b.confidence]);
+    }
+  }
+
+  // Seed AI prompts if empty
+  const promptCount = await dbGet('SELECT COUNT(*) as count FROM ai_prompts');
+  if (promptCount.count === 0) {
+    console.log('Seeding default AI prompts...');
+    const now = new Date().toISOString();
+    const defaultPrompts = [
+      { key: 'battle_bot', content_en: 'You are {name}, a debate opponent with a specific personality.\n{lang_instruction}\n\nPERSONALITY: {personality}\n\n{skill_profile}\n\nMotion: "{motion}"\nYour side: {ai_side_label}\nSpeaker order: The user is {speaker_order} speaker, you are the other.\n\nRULES:\n- Roleplay the personality FIRST, debate skill SECOND.\n- Respond with your debate speech only. No meta-commentary about being AI.\n- Keep speeches concise (100-400 words depending on skill level - lower skill = shorter).\n- Stay on topic. Address the motion directly.\n- If user spoke before you, reference their points according to your rebuttal skill.\n- Do NOT greet casually. Debate directly while maintaining personality.\n- Use markdown formatting for clarity.\n- Personality affects HOW you argue. Skill profile affects HOW WELL you argue.', content_vi: '' },
+      { key: 'judge', content_en: '{lang_instruction}\n\nYou are judging a practice debate. Read this context carefully before judging:\n\nMotion: "{motion}"\n- {user_name} argued the side: {user_side_label}\n- {opponent_name} argued the side: {ai_side_label}\n\nThe transcript below labels every message with the speaker\'s name and side in brackets, e.g. "[{user_name} ({user_side_label})]:" or "[{opponent_name} ({ai_side_label})]:". Read these labels carefully before judging - do NOT mix up who argued which side, and do NOT assume a default winner. Judge strictly based on the actual arguments each side presented in the transcript, not on which side is usually stronger in general.\n\nEvaluate the debate based on these criteria with suggested weights:\n- Argumentation (40-50%): Quality, depth, and structure of arguments\n- Evidence (20-30%): Use of examples, data, and real-world references\n- Rebuttal (20-30%): How well each side addressed opponent\'s arguments\n- Delivery (10-20%): Clarity, coherence, persuasiveness\n\nIMPORTANT: Always use the EXACT section headers below in English, even when writing the content itself in Vietnamese. In the format, "User" refers to {user_name} and "AI Opponent" refers to {opponent_name}:\n\n## Winner: [User/AI Opponent]\n\n### Score Breakdown\n| Criteria | User | AI Opponent |\n|----------|------|-------------|\n| Argumentation | X/10 | X/10 |\n| Evidence | X/10 | X/10 |\n| Rebuttal | X/10 | X/10 |\n| Delivery | X/10 | X/10 |\n| **Total** | **X/40** | **X/40** |\n\n### Analysis\n[Brief analysis of key moments and turning points, referencing which side made which points]\n\n### Feedback for User\n[Constructive feedback for {user_name} - what to improve]', content_vi: '' },
+      { key: 'hint', content_en: 'You are a debate assistant. Give ONE ultra-brief hint (1-2 sentences) about an argument idea or rebuttal angle. Do not explain at length. Just hint.', content_vi: 'Ban la tro ly debate. Cho mot goi y SIEU NGAN GON (1-2 cau) ve y tuong luan diem hoac phan bien. Khong giai thich dai. Chi goi y.' },
+      { key: 'prep', content_en: 'You are a debate prep assistant. Given the motion and position, create a BRIEF prep sheet using MARKDOWN:\n\n## Key Arguments\n- [3 arguments, each 1-2 sentences + keywords]\n\n## Potential Opponent Rebuttals\n- [3 likely rebuttals]\n\n## Counters to Rebuttals\n- [How to answer each rebuttal]\n\n## POIs We Can Raise\n- [3 sharp POIs]\n\n## POIs Against Us + Answers\n- [3 POIs + answers]\n\n## Opening Speech Draft\n[200-300 words, **keywords** bolded]', content_vi: 'Ban la tro ly chuan bi debate. Voi de bai va vi tri duoc cho, hay tao ban chuan bi NGAN GON, SU DUNG MARKDOWN:\n\n## Luan diem chinh\n- [3 luan diem, moi cai 1-2 cau + tu khoa]\n\n## Phan bien tiem nang cua doi thu\n- [3 phan bien co the gap]\n\n## Doi pho phan bien\n- [Cach tra loi tung phan bien]\n\n## POI chung ta co the neu\n- [3 POI sac ben]\n\n## POI chong lai chung ta + Tra loi\n- [3 POI + cau tra loi]\n\n## Ban thao bai mo dau\n[200-300 tu, **tu khoa** duoc in dam]' },
+      { key: 'rebuttal', content_en: 'You are a debate coach. Evaluate the user\'s rebuttal. Respond BRIEFLY in markdown:\n## Rebuttal Evaluation\n- **Strengths**: ...\n- **Weaknesses**: ...\n- **Score**: X/10\n- **Improvement tips**: ...', content_vi: 'Ban la huan luyen vien debate. Danh gia bai phan bien cua nguoi dung. Tra loi NGAN GON bang markdown:\n## Danh gia phan bien\n- **Diem manh**: ...\n- **Diem yeu**: ...\n- **Diem tong**: X/10\n- **Goi y cai thien**: ...' },
+      { key: 'speech', content_en: 'You are a debate coach. Evaluate the user\'s speech. Respond BRIEFLY in markdown:\n## Speech Evaluation\n- **Structure**: X/10\n- **Argumentation**: X/10\n- **Evidence**: X/10\n- **Delivery**: X/10\n- **Total**: X/40\n- **Tips**: ...', content_vi: 'Ban la huan luyen vien debate. Danh gia bai phat bieu cua nguoi dung. Tra loi NGAN GON bang markdown:\n## Danh gia bai phat bieu\n- **Cau truc**: X/10\n- **Lap luan**: X/10\n- **Bang chung**: X/10\n- **Trinh bay**: X/10\n- **Tong diem**: X/40\n- **Goi y**: ...' },
+      { key: 'poi', content_en: 'You are a debate coach. Evaluate the user\'s POI. Respond BRIEFLY in markdown:\n## POI Evaluation\n- **Sharpness**: X/10\n- **Relevance**: X/10\n- **Pressure**: X/10\n- **Total**: X/30\n- **Comment**: ...', content_vi: 'Ban la huan luyen vien debate. Danh gia POI cua nguoi dung. Tra loi NGAN GON bang markdown:\n## Danh gia POI\n- **Sac ben**: X/10\n- **Lien quan**: X/10\n- **Ap luc**: X/10\n- **Tong**: X/30\n- **Nhan xet**: ...' },
+      { key: 'keyword', content_en: 'You are a debate AI. The user gives 5 keywords. Build a BRIEF debate argument (100-200 words) from those keywords. Then EVALUATE:\n## Argument from Keywords\n[Argument]\n## Evaluation\n- **Creativity**: X/10\n- **Coherence**: X/10\n- **Persuasiveness**: X/10', content_vi: 'Ban la debate AI. Nguoi dung cho 5 tu khoa. Hay xay dung mot luan diem debate NGAN GON (100-200 tu) tu cac tu khoa do. Sau do DANH GIA luan diem cua nguoi dung:\n## Luan diem tu tu khoa\n[Luan diem]\n## Danh gia\n- **Sang tao**: X/10\n- **Lien ket**: X/10\n- **Thuyet phuc**: X/10' },
+      { key: 'fallacy_gen', content_en: 'You are a debate assistant. Write a SHORT argument (50-100 words) on the given motion that DELIBERATELY contains ONE logical fallacy (e.g. straw man, ad hominem, slippery slope, false cause, hasty generalization, false dilemma...). Do NOT name the fallacy. Only write the argument.', content_vi: 'Ban la tro ly debate. Viet mot lap luan NGAN (50-100 tu) ve de bai duoc cho, trong do CO Y chua DUNG MOT loi nguy bien logic (vd: nguoi rom, danh vao ca nhan, doc doan, nhan qua sai, khai quat voi, gia dinh sai...). KHONG noi ten loi nguy bien. Chi viet lap luan.' },
+      { key: 'fallacy_spot', content_en: 'You are a debate coach. The given argument contains ONE logical fallacy. Evaluate whether the user correctly identified and explained it. Respond BRIEFLY in markdown:\n## Fallacy Spotting Evaluation\n- **Actual fallacy**: ...\n- **Did user identify it correctly**: Yes/No/Partially\n- **Explanation feedback**: ...\n- **Score**: X/10', content_vi: 'Ban la huan luyen vien debate. Lap luan duoc cho co chua MOT loi nguy bien logic. Danh gia xem nguoi dung co xac dinh dung loi nguy bien va giai thich dung khong. Tra loi NGAN GON bang markdown:\n## Danh gia soi loi logic\n- **Loi nguy bien thuc te**: ...\n- **Nguoi dung xac dinh dung khong**: Co/Khong/Mot phan\n- **Nhan xet giai thich**: ...\n- **Diem**: X/10' },
+      { key: 'weighing_gen', content_en: 'You are a debate assistant. Given the motion, write TWO SHORT competing arguments (30-50 words each): one FOR and one AGAINST. Format:\n## Argument A (For)\n[argument]\n## Argument B (Against)\n[argument]', content_vi: 'Ban la tro ly debate. Voi de bai duoc cho, viet HAI lap luan NGAN doi lap nhau (moi cai 30-50 tu): mot lap luan UNG HO va mot lap luan PHAN DOI. Dinh dang:\n## Lap luan A (Ung ho)\n[lap luan]\n## Lap luan B (Phan doi)\n[lap luan]' },
+      { key: 'weighing_practice', content_en: 'You are a debate coach. Evaluate the user\'s WEIGHING analysis comparing two competing arguments. Respond BRIEFLY in markdown:\n## Weighing Evaluation\n- **Use of weighing criteria** (scope/severity/probability/reversibility): ...\n- **Persuasiveness**: ...\n- **Strengths**: ...\n- **Weaknesses**: ...\n- **Score**: X/10', content_vi: 'Ban la huan luyen vien debate. Danh gia bai phan tich CAN NHAC SO SANH (weighing) cua nguoi dung giua hai lap luan doi lap. Tra loi NGAN GON bang markdown:\n## Danh gia can nhac so sanh\n- **Su dung tieu chi can nhac** (pham vi/muc do/xac suat/kha nang dao nguoc): ...\n- **Tinh thuyet phuc**: ...\n- **Diem manh**: ...\n- **Diem yeu**: ...\n- **Diem**: X/10' },
+      { key: 'case_building', content_en: 'You are a debate coach. Evaluate the user\'s FULL CASE for the given motion and position. A strong case should include: a model/definition, team split (if applicable), 2-3 strong developed arguments, preemptive rebuttal, and weighing. Respond BRIEFLY in markdown:\n## Case Building Evaluation\n- **Model / definition**: X/10\n- **Argument quality**: X/10\n- **Preemptive rebuttal**: X/10\n- **Weighing**: X/10\n- **Total**: X/40\n- **Improvement tips**: ...', content_vi: 'Ban la huan luyen vien debate. Danh gia HE THONG LUAN DIEM (case) day du cua nguoi dung cho de bai va vi tri duoc cho. Mot case tot can co: mo hinh, phan chia doi (neu co), 2-3 luan diem manh, phan bien phu dau, can nhac so sanh. Tra loi NGAN GON bang markdown:\n## Danh gia he thong luan diem\n- **Mo hinh / dinh nghia**: X/10\n- **Chat luong luan diem**: X/10\n- **Phan bien phu dau**: X/10\n- **Can nhac so sanh**: X/10\n- **Tong diem**: X/40\n- **Goi y cai thien**: ...' },
+      { key: 'framing', content_en: 'You are a debate coach. Evaluate the user\'s FRAMING paragraph for the given motion. A good frame controls how the judge interprets the debate (e.g. rights-based, utilitarian, principled, pragmatic). Respond BRIEFLY in markdown:\n## Framing Evaluation\n- **Frame type used**: ...\n- **Clarity**: X/10\n- **Persuasiveness**: X/10\n- **Improvement tips**: ...\n- **Score**: X/10', content_vi: 'Ban la huan luyen vien debate. Danh gia doan KHUNG LAP LUAN (framing) cua nguoi dung cho de bai duoc cho. Mot khung tot kiem soat cach giam khao nhin nhan tranh luan (vd: quyen, vi loi, nguyen tac, thuc dung). Tra loi NGAN GON bang markdown:\n## Danh gia khung lap luan\n- **Loai khung su dung**: ...\n- **Tinh ro rang**: X/10\n- **Tinh thuyet phuc**: X/10\n- **Goi y cai thien**: ...\n- **Diem**: X/10' },
+    ];
+
+    for (const p of defaultPrompts) {
+      await dbRun(`
+        INSERT OR REPLACE INTO ai_prompts (key, content_en, content_vi, updated_at)
+        VALUES (?, ?, ?, ?)
+      `, [p.key, p.content_en, p.content_vi, now]);
     }
   }
 
@@ -724,6 +767,21 @@ app.get('/api/ai/config', async (req, res) => {
   }
 });
 
+// Public prompts endpoint (no auth required)
+app.get('/api/ai/prompts', async (req, res) => {
+  try {
+    const prompts = await dbAll('SELECT key, content_en FROM ai_prompts ORDER BY key ASC');
+    const map = {};
+    for (const p of prompts) {
+      map[p.key] = p.content_en;
+    }
+    res.json({ prompts: map });
+  } catch (err) {
+    console.error('Error fetching prompts', err);
+    res.status(500).json({ error: 'Error fetching prompts' });
+  }
+});
+
 // Proxy AI chat requests through backend with fallback across keys
 app.post('/api/ai/chat', async (req, res) => {
   if (!req.session.userId) {
@@ -752,7 +810,7 @@ app.post('/api/ai/chat', async (req, res) => {
         body: JSON.stringify({
           model: key.model || 'openrouter/auto',
           messages,
-          max_tokens: 2048,
+          max_tokens: 4096,
           temperature: 0.7,
         }),
       });
@@ -836,6 +894,26 @@ app.delete('/api/admin/ai-keys/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+// AI Prompts CRUD (admin only)
+app.get('/api/admin/ai-prompts', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const prompts = await dbAll('SELECT * FROM ai_prompts ORDER BY key ASC');
+  res.json({ prompts });
+});
+
+app.put('/api/admin/ai-prompts/:key', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const { content_en, content_vi } = req.body;
+  const key = req.params.key;
+  const now = new Date().toISOString();
+  await dbRun(
+    `INSERT INTO ai_prompts (key, content_en, content_vi, updated_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET content_en = ?, content_vi = ?, updated_at = ?`,
+    [key, content_en || '', content_vi || '', now, content_en || '', content_vi || '', now]
+  );
+  res.json({ success: true });
+});
+
 // Update Profile/Progress Endpoint
 app.put('/api/auth/profile', async (req, res) => {
   if (!req.session.userId) {
@@ -865,9 +943,18 @@ app.put('/api/auth/profile', async (req, res) => {
     const streak = updates.streak !== undefined ? updates.streak : userRow.streak;
     const lastTrainingDate = updates.lastTrainingDate !== undefined ? updates.lastTrainingDate : userRow.lastTrainingDate;
     const tier = updates.tier !== undefined ? updates.tier : userRow.tier;
+    const username = updates.username ? updates.username.trim() : userRow.username;
+
+    if (updates.username && updates.username.trim() !== userRow.username) {
+      const existing = await dbGet('SELECT id FROM users WHERE username = ? AND id != ?', [username, req.session.userId]);
+      if (existing) {
+        return res.status(409).json({ error: 'Username already taken' });
+      }
+    }
 
     await dbRun(`
       UPDATE users SET
+        username = ?,
         completedLessons = ?,
         savedTopics = ?,
         savedNotes = ?,
@@ -880,7 +967,7 @@ app.put('/api/auth/profile', async (req, res) => {
         lastTrainingDate = ?,
         tier = ?
       WHERE id = ?
-    `, [completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats, trainingScores, totalXp, streak, lastTrainingDate, tier, req.session.userId]);
+    `, [username, completedLessons, savedTopics, savedNotes, recentActivity, botStars, trainingStats, trainingScores, totalXp, streak, lastTrainingDate, tier, req.session.userId]);
 
     const updatedRow = await dbGet('SELECT * FROM users WHERE id = ?', [req.session.userId]);
     res.json({ success: true, user: mapUserRow(updatedRow) });
@@ -1002,7 +1089,7 @@ app.get('/api/content', async (req, res) => {
   try {
     const lessons = await dbAll('SELECT * FROM lessons ORDER BY order_num ASC');
     const topics = await dbAll('SELECT * FROM topics');
-    const bots = await dbAll('SELECT * FROM bots');
+    const bots = await dbAll('SELECT * FROM bots ORDER BY order_num ASC');
     const motions = await getMotionsFromMotionsDb();
     const announcements = await dbAll('SELECT * FROM announcements ORDER BY createdAt DESC');
 
@@ -1197,9 +1284,9 @@ app.post('/api/bots', async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
     await dbRun(`
-      INSERT INTO bots (id, name, avatar, bio_en, bio_vi, displayStrength, hiddenPrompt, knowledge, logic, rebuttal, vocabulary, creativity, confidence)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [bot.id, bot.name, bot.avatar, bot.bio_en, bot.bio_vi, bot.displayStrength, bot.hiddenPrompt, bot.knowledge, bot.logic, bot.rebuttal, bot.vocabulary, bot.creativity, bot.confidence]);
+      INSERT INTO bots (id, name, avatar, avatar_url, bio_en, bio_vi, displayStrength, hiddenPrompt, knowledge, logic, rebuttal, vocabulary, creativity, confidence)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [bot.id, bot.name, bot.avatar, bot.avatar_url || null, bot.bio_en, bot.bio_vi, bot.displayStrength, bot.hiddenPrompt, bot.knowledge, bot.logic, bot.rebuttal, bot.vocabulary, bot.creativity, bot.confidence]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
@@ -1220,6 +1307,7 @@ app.put('/api/bots/:id', async (req, res) => {
 
     const name = updates.name !== undefined ? updates.name : existing.name;
     const avatar = updates.avatar !== undefined ? updates.avatar : existing.avatar;
+    const avatar_url = updates.avatar_url !== undefined ? updates.avatar_url : existing.avatar_url;
     const bio_en = updates.bio_en !== undefined ? updates.bio_en : existing.bio_en;
     const bio_vi = updates.bio_vi !== undefined ? updates.bio_vi : existing.bio_vi;
     const displayStrength = updates.displayStrength !== undefined ? updates.displayStrength : existing.displayStrength;
@@ -1233,10 +1321,10 @@ app.put('/api/bots/:id', async (req, res) => {
 
     await dbRun(`
       UPDATE bots SET
-        name = ?, avatar = ?, bio_en = ?, bio_vi = ?, displayStrength = ?, hiddenPrompt = ?,
+        name = ?, avatar = ?, avatar_url = ?, bio_en = ?, bio_vi = ?, displayStrength = ?, hiddenPrompt = ?,
         knowledge = ?, logic = ?, rebuttal = ?, vocabulary = ?, creativity = ?, confidence = ?
       WHERE id = ?
-    `, [name, avatar, bio_en, bio_vi, displayStrength, hiddenPrompt, knowledge, logic, rebuttal, vocabulary, creativity, confidence, targetId]);
+    `, [name, avatar, avatar_url, bio_en, bio_vi, displayStrength, hiddenPrompt, knowledge, logic, rebuttal, vocabulary, creativity, confidence, targetId]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });

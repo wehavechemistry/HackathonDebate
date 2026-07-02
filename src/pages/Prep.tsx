@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useStore } from '../store';
 import { t } from '../i18n';
-import { callOpenRouter, buildPrepPrompt } from '../api';
+import { callOpenRouterWithRetry, buildPrepPrompt } from '../api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import CoachCrab from '../components/CoachCrab';
 
@@ -23,7 +23,7 @@ export default function Prep() {
     const positionLabel = language === 'vi'
       ? (position === 'for' ? '\u1ee6ng h\u1ed9 (Ch\u00ednh ph\u1ee7)' : 'Ph\u1ea3n \u0111\u1ed1i (\u0110\u1ed1i l\u1eadp)')
       : (position === 'for' ? 'Government (For)' : 'Opposition (Against)');
-    const res = await callOpenRouter([
+    const res = await callOpenRouterWithRetry([
       { role: 'system', content: prompt },
       { role: 'user', content: `Motion: "${topic}"\nPosition: ${positionLabel}` },
     ]);

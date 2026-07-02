@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { User, Lesson, Topic, BotPersonality, DebateMotion, Announcement, AiApiKey, Post, Reply, VoteResult } from './types';
+import { loadPrompts } from './prompts';
 
 interface AppState {
   theme: 'dark' | 'light';
@@ -70,22 +71,25 @@ interface AppState {
 isLessonUnlocked: (lessonId: string) => boolean;
    getNextLesson: (lessonId: string) => Lesson | null;
    
-   fetchPosts: (page?: number, limit?: number, language?: string) => Promise<{ posts: Post[]; total: number }>;
-   createPost: (title_en: string, title_vi: string, content_en: string, content_vi: string, language: string, category?: string) => Promise<boolean>;
-   fetchReplies: (postId: string) => Promise<Reply[]>;
-   createReply: (postId: string, content_en: string, content_vi: string, parent_id?: string, language?: string) => Promise<boolean>;
-   votePost: (postId: string, vote: 1 | -1) => Promise<VoteResult>;
-   voteReply: (replyId: string, vote: 1 | -1) => Promise<VoteResult>;
-   voteAnnouncement: (announcementId: string, vote: 1 | -1) => Promise<VoteResult>;
-   deletePost: (postId: string) => Promise<boolean>;
-   updatePost: (postId: string, updates: Partial<Post>) => Promise<boolean>;
-   updateAnnouncement: (announcementId: string, updates: { title_en?: string; title_vi?: string; content_en?: string; content_vi?: string }) => Promise<boolean>;
-   changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
-   reorderLessons: (ids: string[]) => Promise<boolean>;
-   reorderBots: (ids: string[]) => Promise<boolean>;
-   reorderTopics: (ids: string[]) => Promise<boolean>;
-   deleteUser: (userId: string) => Promise<boolean>;
-}
+    fetchPosts: (page?: number, limit?: number, language?: string) => Promise<{ posts: Post[]; total: number }>;
+    createPost: (title_en: string, title_vi: string, content_en: string, content_vi: string, language: string, category?: string) => Promise<boolean>;
+    fetchReplies: (postId: string) => Promise<Reply[]>;
+    createReply: (postId: string, content_en: string, content_vi: string, parent_id?: string, language?: string) => Promise<boolean>;
+    votePost: (postId: string, vote: 1 | -1) => Promise<VoteResult>;
+    voteReply: (replyId: string, vote: 1 | -1) => Promise<VoteResult>;
+    voteAnnouncement: (announcementId: string, vote: 1 | -1) => Promise<VoteResult>;
+    deletePost: (postId: string) => Promise<boolean>;
+    updatePost: (postId: string, updates: Partial<Post>) => Promise<boolean>;
+    updateAnnouncement: (announcementId: string, updates: { title_en?: string; title_vi?: string; content_en?: string; content_vi?: string }) => Promise<boolean>;
+    changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+    reorderLessons: (ids: string[]) => Promise<boolean>;
+    reorderBots: (ids: string[]) => Promise<boolean>;
+    reorderTopics: (ids: string[]) => Promise<boolean>;
+    deleteUser: (userId: string) => Promise<boolean>;
+    refreshContent: () => Promise<void>;
+    fetchPrompts: () => Promise<Record<string, { key: string; content_en: string; content_vi: string }>>;
+    updatePrompt: (key: string, content_en: string, content_vi: string) => Promise<boolean>;
+  }
 
 const STORAGE_KEY = 'debatecrab_config';
 
@@ -158,10 +162,30 @@ aiKeys: [],
           announcements: contentData.announcements || [],
         });
       }
+
+      await loadPrompts();
     } catch (e) {
       console.error('Error initializing app', e);
     } finally {
       set({ isLoading: false });
+    }
+  },
+
+  refreshContent: async () => {
+    try {
+      const contentRes = await fetch('/api/content');
+      const contentData = await contentRes.json();
+      if (contentData) {
+        set({
+          lessons: contentData.lessons || [],
+          topics: contentData.topics || [],
+          bots: contentData.bots || [],
+          motions: contentData.motions || [],
+          announcements: contentData.announcements || [],
+        });
+      }
+    } catch (e) {
+      console.error('Error refreshing content', e);
     }
   },
 
@@ -688,6 +712,7 @@ unbanUser: async (userId) => {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
+          set({ announcements: get().announcements.map(a => a.id === announcementId ? { ...a, upvotes: (a as any).upvotes + vote, downvotes: (a as any).downvotes + (vote === 1 ? 0 : 1), user_vote: vote } : a) });
           return { success: true, score: 0, count: 0, user_vote: vote };
         }
       }
@@ -766,7 +791,7 @@ unbanUser: async (userId) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids }),
       });
-      if (res.ok) await get().fetchUsers();
+      if (res.ok) await get().refreshContent();
       return res.ok;
     } catch (e) {
       console.error(e);
@@ -780,7 +805,7 @@ unbanUser: async (userId) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids }),
       });
-      if (res.ok) await get().fetchUsers();
+      if (res.ok) await get().refreshContent();
       return res.ok;
     } catch (e) {
       console.error(e);
@@ -794,7 +819,7 @@ unbanUser: async (userId) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids }),
       });
-      if (res.ok) await get().fetchUsers();
+      if (res.ok) await get().refreshContent();
       return res.ok;
     } catch (e) {
       console.error(e);
@@ -812,6 +837,36 @@ unbanUser: async (userId) => {
       console.error(e);
     }
     return false;
+  },
+
+  fetchPrompts: async () => {
+    try {
+      const res = await fetch('/api/admin/ai-prompts');
+      if (res.ok) {
+        const data = await res.json();
+        const arr = Array.isArray(data.prompts) ? data.prompts : [];
+        const map: Record<string, { key: string; content_en: string; content_vi: string }> = {};
+        for (const p of arr) map[p.key] = p;
+        return map;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return {};
+  },
+
+  updatePrompt: async (key, content_en, content_vi) => {
+    try {
+      const res = await fetch(`/api/admin/ai-prompts/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_en, content_vi }),
+      });
+      return res.ok;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
   },
 
   completeLesson: async (lessonId) => {

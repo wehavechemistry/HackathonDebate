@@ -200,3 +200,21 @@ export function getBotAvatar(avatarId: string, size?: number) {
     default: return <EngineAvatar size={s} />;
   }
 }
+
+export function BotAvatar({ bot, size = 48 }: { bot: { avatarUrl?: string; avatar: string }; size?: number }) {
+  const src = bot.avatarUrl || bot.avatar;
+  const isImage = !!bot.avatarUrl;
+  if (isImage) {
+    return (
+      <img
+        src={src}
+        alt={bot.avatar}
+        width={size}
+        height={size}
+        className="rounded-full object-cover"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return getBotAvatar(bot.avatar, size);
+}

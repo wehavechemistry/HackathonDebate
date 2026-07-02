@@ -23,6 +23,8 @@ export default function Topics() {
     { key: 'misc', label: t('topics.misc', language), color: 'from-slate-500 to-gray-500' },
   ];
 
+  const getCategoryImage = (catKey: string) => `/topic-thumbnails/${catKey}.png`;
+
   // View single topic
   if (activeTopic) {
     const topic = topics.find(tp => tp.id === activeTopic);
@@ -65,26 +67,33 @@ export default function Topics() {
         </button>
         <h1 className="text-2xl font-bold text-white mb-6">{catLabel}</h1>
         {catTopics.length === 0 ? (
-          <p className="text-slate-500">{language === 'vi' ? 'Ch\u01b0a c\u00f3 ch\u1ee7 \u0111\u1ec1 n\u00e0o.' : 'No topics yet.'}</p>
+          <p className="text-slate-500">{language === 'vi' ? 'Chưa có chủ đề nào.' : 'No topics yet.'}</p>
         ) : (
           <div className="space-y-3">
-            {catTopics.map((tp, i) => (
-              <motion.button
-                key={tp.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-                onClick={() => setActiveTopic(tp.id)}
-                className="w-full text-left flex items-center gap-4 p-4 rounded-xl bg-slate-800/30 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/50 transition-all group"
-              >
-                <div className="p-2 rounded-lg bg-orange-500/10">
-                  <BookOpen size={18} className="text-orange-400" />
-                </div>
-                <span className="text-white font-medium group-hover:text-orange-400 transition-colors">
-                  {language === 'vi' ? tp.title_vi : tp.title_en}
-                </span>
-              </motion.button>
-            ))}
+            {catTopics.map((tp, i) => {
+              const thumb = tp.image_id ? `/topic-thumbnails/${tp.image_id}.png` : null;
+              return (
+                <motion.button
+                  key={tp.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  onClick={() => setActiveTopic(tp.id)}
+                  className="w-full text-left flex items-center gap-4 p-4 rounded-xl bg-slate-800/30 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/50 transition-all group"
+                >
+                  {thumb ? (
+                    <img src={thumb} alt={tp.category} className="w-10 h-10 rounded-lg object-cover" />
+                  ) : (
+                    <div className="p-2 rounded-lg bg-orange-500/10">
+                      <BookOpen size={18} className="text-orange-400" />
+                    </div>
+                  )}
+                  <span className="text-white font-medium group-hover:text-orange-400 transition-colors">
+                    {language === 'vi' ? tp.title_vi : tp.title_en}
+                  </span>
+                </motion.button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -103,6 +112,7 @@ export default function Topics() {
         <AnimatePresence>
           {categories.map((cat, i) => {
             const count = topics.filter(tp => tp.category === cat.key).length;
+            const thumb = getCategoryImage(cat.key);
             return (
               <motion.button
                 key={cat.key}
@@ -110,15 +120,15 @@ export default function Topics() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
                 onClick={() => setActiveCategory(cat.key)}
-                className="text-left p-5 rounded-2xl border border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/60 transition-all hover:border-slate-600 group"
+                className="text-left p-0 rounded-2xl border border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/60 transition-all hover:border-slate-600 group overflow-hidden"
               >
-                <div className={`inline-flex p-2 rounded-lg bg-gradient-to-r ${cat.color} mb-3`}>
-                  <BookOpen size={20} className="text-white" />
+                <img src={thumb} alt={cat.key} className="w-full h-32 object-cover" />
+                <div className="p-5">
+                  <h3 className="font-semibold text-white group-hover:text-orange-400 transition-colors">{cat.label}</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {count} {language === 'vi' ? 'chủ đề' : 'topics'}
+                  </p>
                 </div>
-                <h3 className="font-semibold text-white group-hover:text-orange-400 transition-colors">{cat.label}</h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  {count} {language === 'vi' ? 'ch\u1ee7 \u0111\u1ec1' : 'topics'}
-                </p>
               </motion.button>
             );
           })}

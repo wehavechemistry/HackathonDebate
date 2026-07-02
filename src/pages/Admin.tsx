@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BookOpen, Users, Bot, FileText, Megaphone, Plus, Trash2, Edit3, Shield, Ban, Pin, Save, X, Key, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { BookOpen, Users, Bot, FileText, Megaphone, Plus, Trash2, Edit3, Shield, Ban, Pin, Save, X, Key, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import CoachCrab from '../components/CoachCrab';
 import type { Lesson, Topic, BotPersonality, Announcement, Post } from '../types';
 
-type Tab = 'lessons' | 'users' | 'bots' | 'topics' | 'announcements' | 'announcements_manage' | 'ai_keys' | 'create_admin' | 'community';
+type Tab = 'lessons' | 'users' | 'bots' | 'topics' | 'announcements' | 'announcements_manage' | 'ai_keys' | 'create_admin' | 'community' | 'prompts';
 
 export default function Admin() {
   const store = useStore();
-  const { currentUser, language, users, lessons, topics, bots, announcements } = store;
+  const { currentUser, language, users, lessons, topics, bots, announcements, fetchPrompts, updatePrompt } = store;
   const [tab, setTab] = useState<Tab>('lessons');
 
   if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'head_admin')) {
@@ -28,6 +28,7 @@ export default function Admin() {
     { key: 'topics', label: t('admin.topics', language), icon: FileText },
     { key: 'announcements_manage', label: t('admin.announcements_manage', language), icon: Megaphone },
     { key: 'community', label: t('admin.community', language), icon: FileText },
+    { key: 'prompts', label: 'AI Prompts', icon: MessageSquare },
     { key: 'ai_keys', label: t('admin.ai_keys', language), icon: Key },
     { key: 'create_admin', label: t('admin.create_admin', language), icon: Shield, headOnly: true },
   ];
@@ -63,6 +64,7 @@ export default function Admin() {
         {tab === 'topics' && <TopicsManager />}
         {tab === 'announcements_manage' && <AnnouncementsManager />}
         {tab === 'community' && <CommunityManager />}
+        {tab === 'prompts' && <PromptsManager />}
         {tab === 'ai_keys' && <AiKeysManager />}
         {tab === 'create_admin' && isHeadAdmin && <CreateAdmin />}
       </motion.div>
@@ -272,7 +274,7 @@ function BotsManager() {
   const [form, setForm] = useState<Partial<BotPersonality>>({});
 
   const moveBot = async (id: string, direction: 'up' | 'down') => {
-    const sorted = [...bots].sort((a, b) => a.displayStrength - b.displayStrength || a.id.localeCompare(b.id));
+    const sorted = [...bots].sort((a, b) => (a.order_num || 0) - (b.order_num || 0) || a.id.localeCompare(b.id));
     const idx = sorted.findIndex(b => b.id === id);
     const newIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (newIdx < 0 || newIdx >= sorted.length) return;
@@ -320,9 +322,23 @@ function BotsManager() {
                 className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Avatar ID</label>
+              <label className="block text-xs text-slate-400 mb-1">Avatar</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {['duy', 'thai', 'han', 'bach', 'dung', 'tom', 'engine'].map(avatarId => (
+                  <button
+                    key={avatarId}
+                    type="button"
+                    onClick={() => setForm({ ...form, avatar: avatarId })}
+                    className={`w-10 h-10 rounded-full border-2 overflow-hidden transition-all ${
+                      form.avatar === avatarId ? 'border-orange-500 shadow-lg shadow-orange-500/30' : 'border-slate-700 hover:border-slate-500'
+                    }`}
+                  >
+                    <img src={`/avatars/${avatarId}.png`} alt={avatarId} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
               <input type="text" value={form.avatar || ''} onChange={e => setForm({ ...form, avatar: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="duy, thai, han, bach, dung, tom, engine" />
+                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Custom avatar id" />
             </div>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
@@ -435,12 +451,31 @@ function TopicsManager() {
               <select value={form.category || 'education'} onChange={e => setForm({ ...form, category: e.target.value })}
                 className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Title (EN)</label>
+               </select>
+             </div>
+           </div>
+           <div>
+             <label className="block text-xs text-slate-400 mb-1">Thumbnail</label>
+             <div className="flex flex-wrap gap-2 mb-2">
+               {categories.map(cat => (
+                 <button
+                   key={cat}
+                   type="button"
+                   onClick={() => setForm({ ...form, image_id: cat })}
+                   className={`w-12 h-12 rounded-lg border-2 overflow-hidden transition-all ${
+                     form.image_id === cat ? 'border-orange-500 shadow-lg shadow-orange-500/30' : 'border-slate-700 hover:border-slate-500'
+                   }`}
+                 >
+                   <img src={`/topic-thumbnails/${cat}.png`} alt={cat} className="w-full h-full object-cover" />
+                 </button>
+               ))}
+             </div>
+             <input type="text" value={form.image_id || ''} onChange={e => setForm({ ...form, image_id: e.target.value })}
+               className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Custom image id (leave empty for none)" />
+           </div>
+           <div className="grid sm:grid-cols-2 gap-4">
+             <div>
+               <label className="block text-xs text-slate-400 mb-1">Title (EN)</label>
               <input type="text" value={form.title_en || ''} onChange={e => setForm({ ...form, title_en: e.target.value })}
                 className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
             </div>
@@ -620,6 +655,120 @@ function CommunityManager() {
               <div className="flex gap-2">
                 <button onClick={saveEditVotes} className="flex-1 py-2 bg-orange-500 text-white text-sm rounded-lg">Save</button>
                 <button onClick={() => setEditingId(null)} className="flex-1 py-2 bg-slate-700 text-white text-sm rounded-lg">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PromptsManager() {
+  const { language, fetchPrompts, updatePrompt } = useStore();
+  const [prompts, setPrompts] = useState<Record<string, { key: string; content_en: string; content_vi: string }>>({});
+  const [loading, setLoading] = useState(false);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ content_en: '', content_vi: '' });
+
+  const promptKeys = [
+    'battle_bot',
+    'judge',
+    'hint',
+    'prep',
+    'rebuttal',
+    'speech',
+    'poi',
+    'keyword',
+    'fallacy_gen',
+    'fallacy_spot',
+    'weighing_gen',
+    'weighing_practice',
+    'case_building',
+    'framing',
+  ];
+
+  const load = async () => {
+    setLoading(true);
+    const data = await fetchPrompts();
+    setPrompts(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const startEdit = (key: string) => {
+    const p = prompts[key] || { key, content_en: '', content_vi: '' };
+    setEditForm({ content_en: p.content_en, content_vi: p.content_vi });
+    setEditingKey(key);
+  };
+
+  const saveEdit = async () => {
+    if (!editingKey) return;
+    await updatePrompt(editingKey, editForm.content_en, editForm.content_vi);
+    await load();
+    setEditingKey(null);
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-white">AI Prompts</h2>
+        <button onClick={load} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg">
+          Refresh
+        </button>
+      </div>
+      <p className="text-xs text-slate-400 mb-4">
+        Templates support placeholders like {'{motion}'}, {'{personality}'}, {'{lang_instruction}'}, {'{skill_profile}'}, etc. They will be replaced at runtime.
+      </p>
+
+      {loading && <p className="text-sm text-slate-400">Loading...</p>}
+
+      <div className="space-y-2">
+        {promptKeys.map(key => {
+          const p = prompts[key];
+          return (
+            <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 group">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-white font-medium">{key}</p>
+                <p className="text-xs text-slate-500 truncate">{p ? p.content_en.slice(0, 80) : 'Not set'}</p>
+              </div>
+              <button onClick={() => startEdit(key)} className="p-1.5 text-slate-400 hover:text-blue-400 shrink-0">
+                <Edit3 size={14} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {editingKey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setEditingKey(null)}>
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-white font-semibold mb-4">Edit Prompt: {editingKey}</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">English</label>
+                <textarea
+                  value={editForm.content_en}
+                  onChange={e => setEditForm({ ...editForm, content_en: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none font-mono"
+                  rows={6}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Vietnamese</label>
+                <textarea
+                  value={editForm.content_vi}
+                  onChange={e => setEditForm({ ...editForm, content_vi: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none font-mono"
+                  rows={6}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={saveEdit} className="flex-1 py-2 bg-orange-500 text-white text-sm rounded-lg">Save</button>
+                <button onClick={() => setEditingKey(null)} className="flex-1 py-2 bg-slate-700 text-white text-sm rounded-lg">Cancel</button>
               </div>
             </div>
           </div>

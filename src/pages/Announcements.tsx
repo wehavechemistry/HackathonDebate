@@ -59,7 +59,7 @@ export default function Announcements() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <h3 className="text-white font-medium text-lg">
-                        {language === 'vi' ? a.title_vi : a.title_en}
+                        {a.title_en}
                       </h3>
                       <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
                         <Calendar size={12} />
@@ -86,7 +86,7 @@ export default function Announcements() {
                       exit={{ opacity: 0, height: 0 }}
                       className="mt-4 pt-4 border-t border-slate-700/50"
                     >
-                      <MarkdownRenderer content={language === 'vi' ? a.content_vi : a.content_en} />
+                      <MarkdownRenderer content={a.content_en} />
                     </motion.div>
                   )}
 

@@ -72,12 +72,14 @@ export interface Topic {
   title_vi: string;
   content_en: string;
   content_vi: string;
+  image_id?: string;
 }
 
 export interface BotPersonality {
   id: string;
   name: string;
   avatar: string;
+  avatarUrl?: string;
   bio_en: string;
   bio_vi: string;
   displayStrength: number;
@@ -88,6 +90,7 @@ export interface BotPersonality {
   vocabulary: number;
   creativity: number;
   confidence: number;
+  order_num?: number;
 }
 
 export interface DebateMotion {

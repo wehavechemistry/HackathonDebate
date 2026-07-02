@@ -17,8 +17,8 @@ export default function Community() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ title_en: '', title_vi: '', content_en: '', content_vi: '', category: 'general' as typeof categories[number] });
-  const [replyForm, setReplyForm] = useState({ content_en: '', content_vi: '' });
+  const [form, setForm] = useState({ title: '', content: '', category: 'general' as typeof categories[number] });
+  const [replyContent, setReplyContent] = useState('');
   const [replying, setReplying] = useState(false);
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export default function Community() {
 
   const loadPosts = async () => {
     setLoading(true);
-    const result = await fetchPosts(1, 20, language);
+    const result = await fetchPosts(1, 20, 'en');
     setTotal(result.total);
     setPage(1);
     setLoading(false);
@@ -35,7 +35,7 @@ export default function Community() {
 
   const loadMore = async () => {
     setLoading(true);
-    const result = await fetchPosts(page + 1, 20, language);
+    const result = await fetchPosts(page + 1, 20, 'en');
     setPage(p => p + 1);
     setLoading(false);
   };
@@ -73,20 +73,20 @@ export default function Community() {
   };
 
   const submitPost = async () => {
-    if (!form.title_en || !form.content_en) return;
-    const success = await createPost(form.title_en, form.title_vi, form.content_en, form.content_vi, language, form.category);
+    if (!form.title || !form.content) return;
+    const success = await createPost(form.title, form.title, form.content, form.content, 'en', form.category);
     if (success) {
       setCreating(false);
-      setForm({ title_en: '', title_vi: '', content_en: '', content_vi: '', category: 'general' });
+      setForm({ title: '', content: '', category: 'general' });
       loadPosts();
     }
   };
 
   const submitReply = async () => {
-    if (!selectedPostId || (!replyForm.content_en && !replyForm.content_vi)) return;
-    const success = await createReply(selectedPostId, replyForm.content_en, replyForm.content_vi, undefined, language);
+    if (!selectedPostId || !replyContent.trim()) return;
+    const success = await createReply(selectedPostId, replyContent, replyContent, undefined, 'en');
     if (success) {
-      setReplyForm({ content_en: '', content_vi: '' });
+      setReplyContent('');
       setReplying(false);
       await fetchReplies(selectedPostId);
     }
@@ -119,7 +119,7 @@ export default function Community() {
           <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
-                <h1 className="text-2xl font-bold text-white mb-2">{language === 'vi' ? selectedPost.title_vi : selectedPost.title_en}</h1>
+                <h1 className="text-2xl font-bold text-white mb-2">{selectedPost.title_en}</h1>
                 <div className="flex items-center gap-3 text-xs text-slate-500">
                   <span>by {selectedPost.author_name}</span>
                   <span>{new Date(selectedPost.created_at).toLocaleDateString()}</span>
@@ -158,7 +158,7 @@ export default function Community() {
               </div>
             </div>
 
-            <MarkdownRenderer content={language === 'vi' ? selectedPost.content_vi : selectedPost.content_en} />
+            <MarkdownRenderer content={selectedPost.content_en} />
           </div>
 
           <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
@@ -198,7 +198,7 @@ export default function Community() {
                         </button>
                       </div>
                     </div>
-                    <MarkdownRenderer content={language === 'vi' ? reply.content_vi : reply.content_en} className="text-sm" />
+                    <MarkdownRenderer content={reply.content_en} className="text-sm" />
                   </div>
                 ))}
               </div>
@@ -220,29 +220,22 @@ export default function Community() {
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-3"
                   >
-                    <div className="grid sm:grid-cols-2 gap-3">
-                      <textarea
-                        value={replyForm.content_en}
-                        onChange={e => setReplyForm({ ...replyForm, content_en: e.target.value })}
-                        placeholder="Reply (EN) - Markdown supported"
-                        className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-                        rows={3}
-                      />
-                      <textarea
-                        value={replyForm.content_vi}
-                        onChange={e => setReplyForm({ ...replyForm, content_vi: e.target.value })}
-                        placeholder="Reply (VI) - Hỗ tr� ng markdown"
-                        className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-                        rows={3}
-                      />
-                    </div>
-                    <button
-                      onClick={submitReply}
-                      disabled={(!replyForm.content_en && !replyForm.content_vi)}
-                      className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm rounded-lg transition-all"
-                    >
-                      {t('admin.save', language) || 'Submit'}
-                    </button>
+                <div className="space-y-3">
+                  <textarea
+                    value={replyContent}
+                    onChange={e => setReplyContent(e.target.value)}
+                    placeholder="Write your reply... (Markdown supported)"
+                    className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                    rows={3}
+                  />
+                  <button
+                    onClick={submitReply}
+                    disabled={!replyContent.trim()}
+                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm rounded-lg transition-all"
+                  >
+                    {t('admin.save', language) || 'Submit'}
+                  </button>
+                </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -286,52 +279,36 @@ export default function Community() {
                 <option key={c} value={c} className="capitalize">{c}</option>
               ))}
             </select>
-            <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-3">
               <input
                 type="text"
-                value={form.title_en}
-                onChange={e => setForm({ ...form, title_en: e.target.value })}
-                placeholder="Title (EN)"
+                value={form.title}
+                onChange={e => setForm({ ...form, title: e.target.value })}
+                placeholder="Post title"
                 className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
               />
-              <input
-                type="text"
-                value={form.title_vi}
-                onChange={e => setForm({ ...form, title_vi: e.target.value })}
-                placeholder="Title (VI)"
-                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-            <div className="grid sm:grid-cols-2 gap-3">
               <textarea
-                value={form.content_en}
-                onChange={e => setForm({ ...form, content_en: e.target.value })}
-                placeholder="Content (EN) - Markdown supported"
+                value={form.content}
+                onChange={e => setForm({ ...form, content: e.target.value })}
+                placeholder="Post content... (Markdown supported)"
                 className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
                 rows={4}
               />
-              <textarea
-                value={form.content_vi}
-                onChange={e => setForm({ ...form, content_vi: e.target.value })}
-                placeholder="Content (VI) - Hỗ trợ markdown"
-                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-                rows={4}
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={submitPost}
-                disabled={!form.title_en || !form.content_en}
-                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm rounded-lg transition-all"
-              >
-                {t('admin.save', language) || 'Submit'}
-              </button>
-              <button
-                onClick={() => setCreating(false)}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-all"
-              >
-                {t('admin.cancel', language)}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={submitPost}
+                  disabled={!form.title || !form.content}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm rounded-lg transition-all"
+                >
+                  {t('admin.save', language) || 'Submit'}
+                </button>
+                <button
+                  onClick={() => setCreating(false)}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-all"
+                >
+                  {t('admin.cancel', language)}
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -356,7 +333,7 @@ export default function Community() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-white font-medium text-lg mb-1 group-hover:text-orange-400 transition-colors">
-                      {language === 'vi' ? post.title_vi : post.title_en}
+                      {post.title_en}
                     </h3>
                     <div className="flex items-center gap-3 text-xs text-slate-500 mb-2">
                       <span>by {post.author_name}</span>
@@ -364,7 +341,7 @@ export default function Community() {
                       <span className="px-2 py-0.5 bg-slate-700/50 rounded capitalize">{post.category}</span>
                     </div>
                     <p className="text-slate-400 text-sm line-clamp-2">
-                      {language === 'vi' ? post.content_vi : post.content_en}
+                      {post.content_en}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
