@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import { useStore } from './store';
 import Navbar from './components/Navbar';
+import ToastContainer from './components/ToastContainer';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -18,7 +19,7 @@ import Community from './pages/Community';
 import Announcements from './pages/Announcements';
 
 export default function App() {
-  const { theme, initApp, isLoading } = useStore();
+  const { theme, initApp, isLoading, currentUser } = useStore();
 
   useEffect(() => {
     document.documentElement.classList.remove('dark', 'light');
@@ -42,9 +43,10 @@ export default function App() {
     <HashRouter>
       <div className={`min-h-screen ${theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-gray-50 text-gray-900'}`}>
         <Navbar />
+        <ToastContainer />
         <main className="pt-16">
           <Routes>
-            <Route path="/" element={<Home />} />
+            {currentUser ? <Route path="/" element={<Dashboard />} /> : <Route path="/" element={<Home />} />}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/dashboard" element={<Dashboard />} />

@@ -206,15 +206,14 @@ export function BotAvatar({ bot, size = 48 }: { bot: { avatarUrl?: string; avata
   const isImage = !!bot.avatarUrl;
   if (isImage) {
     return (
-      <img
-        src={src}
-        alt={bot.avatar}
-        width={size}
-        height={size}
-        className="rounded-full object-cover"
-        style={{ width: size, height: size }}
-      />
+      <div style={{ width: size, height: size }} className="rounded-full overflow-hidden shrink-0">
+        <img
+          src={src}
+          alt={bot.avatar}
+          className="w-full h-full object-cover"
+        />
+      </div>
     );
   }
-  return getBotAvatar(bot.avatar, size);
+  return <div style={{ width: size, height: size }} className="shrink-0">{getBotAvatar(bot.avatar, size)}</div>;
 }

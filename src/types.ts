@@ -56,6 +56,7 @@ export interface Activity {
 
 export interface Lesson {
   id: string;
+  type?: 'static' | 'interactive';
   level: 'beginner' | 'intermediate' | 'advanced';
   title_en: string;
   title_vi: string;
@@ -63,6 +64,33 @@ export interface Lesson {
   content_vi: string;
   order: number;
   pinned: boolean;
+  description?: string;
+  xpReward?: number;
+  coachId?: string;
+  coachName?: string;
+  steps?: LessonStep[];
+}
+
+export interface LessonStep {
+  id: string;
+  type: 'text' | 'quiz' | 'essay' | 'end';
+  coachText: string;
+  options?: string[];
+  correctIndex?: number;
+  explanation?: string;
+  placeholder?: string;
+  nextId: string | null;
+}
+
+export interface LessonScript {
+  id: string;
+  title: string;
+  level: 'beginner' | 'intermediate' | 'advanced';
+  description: string;
+  xpReward: number;
+  coachId?: string;
+  coachName?: string;
+  steps: LessonStep[];
 }
 
 export interface Topic {
@@ -91,6 +119,7 @@ export interface BotPersonality {
   creativity: number;
   confidence: number;
   order_num?: number;
+  voice_style?: 'man' | 'woman' | 'boy' | 'girl' | 'default';
 }
 
 export interface DebateMotion {

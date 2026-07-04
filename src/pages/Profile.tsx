@@ -93,7 +93,7 @@ export default function Profile() {
           )}
         </div>
 
-        {/* Stats */}
+{/* Stats */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 mb-6">
           <h2 className="font-semibold text-white flex items-center gap-2 mb-4">
             <BarChart3 size={18} className="text-orange-400" />
@@ -101,16 +101,12 @@ export default function Profile() {
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {[
-              { label: language === 'vi' ? 'Tr\u1eadn \u0111\u1ea5u' : 'Debates', value: currentUser.trainingStats.debates || 0 },
-              { label: language === 'vi' ? 'Ph\u1ea3n bi\u1ec7n' : 'Rebuttals', value: currentUser.trainingStats.rebuttals || 0 },
-              { label: language === 'vi' ? 'Di\u1ec5n thuy\u1ebft' : 'Speeches', value: currentUser.trainingStats.speeches || 0 },
+              { label: language === 'vi' ? 'Trận đấu' : 'Debates', value: currentUser.trainingStats.debates || 0 },
+              { label: language === 'vi' ? 'Phản biện' : 'Rebuttals', value: currentUser.trainingStats.rebuttals || 0 },
+              { label: language === 'vi' ? 'Diễn thuyết' : 'Speeches', value: currentUser.trainingStats.speeches || 0 },
               { label: 'POIs', value: currentUser.trainingStats.pois || 0 },
-              { label: language === 'vi' ? 'T\u1eeb kh\u00f3a' : 'Keyword Battles', value: currentUser.trainingStats.keywordBattles || 0 },
-              { label: language === 'vi' ? 'Soi l\u1ed7i logic' : 'Fallacy Spotting', value: currentUser.trainingStats.fallacySpotting || 0 },
-              { label: language === 'vi' ? 'C\u00e2n nh\u1eafc so s\u00e1nh' : 'Weighing', value: currentUser.trainingStats.weighing || 0 },
-              { label: language === 'vi' ? 'X\u00e2y h\u1ec7 th\u1ed1ng' : 'Case Building', value: currentUser.trainingStats.caseBuilding || 0 },
-              { label: language === 'vi' ? 'Khung l\u1eadp lu\u1eadn' : 'Framing', value: currentUser.trainingStats.framing || 0 },
-              { label: language === 'vi' ? 'B\u00e0i h\u1ecdc' : 'Lessons', value: `${completedCount}/${totalLessons}` },
+              { label: language === 'vi' ? 'Khung lập luận' : 'Framing', value: currentUser.trainingStats.framing || 0 },
+              { label: language === 'vi' ? 'Bài học' : 'Lessons', value: `${completedCount}/${totalLessons}` },
             ].map((stat, i) => (
               <div key={i} className="p-3 rounded-xl bg-slate-900/30 text-center">
                 <p className="text-2xl font-bold text-orange-400">{stat.value}</p>

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BookOpen, Users, Bot, FileText, Megaphone, Plus, Trash2, Edit3, Shield, Ban, Pin, Save, X, Key, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare } from 'lucide-react';
+import { BookOpen, Users, Bot, FileText, Megaphone, Plus, Trash2, Edit3, Shield, Ban, Pin, Save, X, Key, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, Calendar, Clock, HelpCircle, Award } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import CoachCrab from '../components/CoachCrab';
-import type { Lesson, Topic, BotPersonality, Announcement, Post } from '../types';
+import type { Lesson, Topic, BotPersonality, Announcement, Post, LessonScript, LessonStep } from '../types';
 
 type Tab = 'lessons' | 'users' | 'bots' | 'topics' | 'announcements' | 'announcements_manage' | 'ai_keys' | 'create_admin' | 'community' | 'prompts';
 
@@ -73,10 +73,11 @@ export default function Admin() {
 }
 
 function LessonsManager() {
-  const { lessons, language, addLesson, updateLesson, deleteLesson, reorderLessons } = useStore();
+  const { lessons, language, addLesson, updateLesson, deleteLesson, reorderLessons, addInteractiveLesson, updateInteractiveLesson, deleteInteractiveLesson } = useStore();
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<Partial<Lesson>>({});
+  const [form, setForm] = useState<Partial<Lesson & LessonScript & { type: 'static' | 'interactive' }>>({ steps: [], type: 'static' });
+  const [currentStep, setCurrentStep] = useState<Partial<LessonStep> & { optionsText?: string }>({});
 
   const moveLesson = async (id: string, direction: 'up' | 'down') => {
     const sorted = [...lessons].sort((a, b) => {
@@ -92,35 +93,78 @@ function LessonsManager() {
   };
 
   const startCreate = () => {
-    setForm({ id: 'l_' + Date.now(), level: 'beginner', title_en: '', title_vi: '', content_en: '', content_vi: '', order: lessons.length + 1, pinned: false });
+    setForm({ id: 'l_' + Date.now(), type: 'static', level: 'beginner', title_en: '', title_vi: '', content_en: '', content_vi: '', order: lessons.length + 1, pinned: false, steps: [] });
     setCreating(true);
     setEditing(null);
   };
 
-  const startEdit = (lesson: Lesson) => {
-    setForm({ ...lesson });
+  const startEdit = (lesson: any) => {
+    setForm({ ...lesson, type: lesson.type || 'static' });
     setEditing(lesson.id);
     setCreating(false);
   };
 
+  const addStep = () => {
+    if (!currentStep.coachText) return;
+    const newStep: LessonStep = {
+      id: 'step_' + Date.now(),
+      type: 'text',
+      coachText: currentStep.coachText || '',
+      nextId: null,
+    };
+    if ((currentStep as any).optionsText) {
+      newStep.type = 'quiz';
+      newStep.options = (currentStep as any).optionsText.split('\n').filter(Boolean);
+      newStep.correctIndex = currentStep.correctIndex ?? 0;
+      newStep.explanation = currentStep.explanation || '';
+    } else if (currentStep.placeholder) {
+      newStep.type = 'essay';
+      newStep.placeholder = currentStep.placeholder;
+    }
+    setForm({ ...form, steps: [...(form.steps || []), newStep] });
+    setCurrentStep({});
+  };
+
   const saveForm = () => {
     if (!form.title_en || !form.title_vi) return;
-    if (creating) {
-      addLesson(form as Lesson);
-    } else if (editing) {
-      updateLesson(editing, form);
+    if (form.type === 'interactive') {
+      const script: LessonScript = {
+        id: form.id || 'script_' + Date.now(),
+        title: form.title_en || '',
+        level: form.level || 'beginner',
+        description: form.description || '',
+        xpReward: form.xpReward || 50,
+        coachId: form.coachId || 'crab',
+        coachName: form.coachName || 'Coach Crab',
+        steps: form.steps || [],
+      };
+      if (creating) {
+        addInteractiveLesson(script);
+      } else if (editing) {
+        updateInteractiveLesson(editing, script);
+      }
+    } else {
+      if (creating) {
+        addLesson(form as Lesson);
+      } else if (editing) {
+        updateLesson(editing, form);
+      }
     }
     setEditing(null);
     setCreating(false);
-    setForm({});
+    setForm({ type: 'static', steps: [] });
   };
 
-  const cancel = () => { setEditing(null); setCreating(false); setForm({}); };
+  const cancel = () => { setEditing(null); setCreating(false); setForm({ type: 'static', steps: [] }); };
+
+  const allLessons = lessons.map(l => ({ ...l, type: l.type || 'static' as const }));
 
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-white">{t('admin.lessons', language)} ({lessons.length})</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-lg font-semibold text-white">{t('admin.lessons', language)} ({allLessons.length})</h2>
+        </div>
         <button onClick={startCreate} className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-lg transition-all">
           <Plus size={14} /> {t('admin.create_lesson', language)}
         </button>
@@ -129,6 +173,17 @@ function LessonsManager() {
       {(creating || editing) && (
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-5 mb-6 space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Type</label>
+              <div className="flex gap-1">
+                {(['static', 'interactive'] as const).map(t => (
+                  <button key={t} type="button" onClick={() => setForm({ ...form, type: t })}
+                    className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${form.type === t ? 'bg-orange-500 text-white' : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700/50'}`}>
+                    {t === 'static' ? 'Static' : 'Interactive'}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Level</label>
               <select value={form.level || 'beginner'} onChange={e => setForm({ ...form, level: e.target.value as Lesson['level'] })}
@@ -143,6 +198,13 @@ function LessonsManager() {
               <input type="number" value={form.order || 1} onChange={e => setForm({ ...form, order: Number(e.target.value) })}
                 className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
             </div>
+            {form.type === 'interactive' && (
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">XP Reward</label>
+                <input type="number" value={form.xpReward || 50} onChange={e => setForm({ ...form, xpReward: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+              </div>
+            )}
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
@@ -156,24 +218,90 @@ function LessonsManager() {
                 className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
             </div>
           </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Content (EN) - Markdown</label>
-            <textarea value={form.content_en || ''} onChange={e => setForm({ ...form, content_en: e.target.value })}
-              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" rows={8} />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Content (VI) - Markdown</label>
-            <textarea value={form.content_vi || ''} onChange={e => setForm({ ...form, content_vi: e.target.value })}
-              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" rows={8} />
-          </div>
-          {form.content_en && (
-            <div>
-              <p className="text-xs text-slate-400 mb-1">Preview (EN)</p>
-              <div className="p-3 rounded-lg bg-slate-900/30 max-h-40 overflow-y-auto">
-                <MarkdownRenderer content={form.content_en} className="text-sm" />
+          
+          {form.type === 'interactive' && (
+            <>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Description / Coach Name</label>
+                <input type="text" value={form.coachName || ''} onChange={e => setForm({ ...form, coachName: e.target.value, description: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Coach name (appears in lesson)" />
               </div>
-            </div>
+              
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Coach</label>
+                <select value={form.coachId || 'crab'} onChange={e => setForm({ ...form, coachId: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+                  <option value="crab">Coach Crab</option>
+                  <option value="duy">Duy</option>
+                  <option value="thai">Thai</option>
+                  <option value="han">Han</option>
+                  <option value="bach">Bach</option>
+                  <option value="dung">Dung</option>
+                  <option value="tom">Tom</option>
+                </select>
+              </div>
+
+              <div className="border-t border-slate-700 pt-4">
+                <h3 className="text-sm font-semibold text-white mb-2">Steps Builder ({form.steps?.length || 0} steps)</h3>
+                {(form.steps || []).map((step, i) => (
+                  <div key={step.id} className="p-2 mb-2 bg-slate-900/30 rounded-lg text-xs text-slate-300">
+                    <span className="font-semibold">{i + 1}. {step.type}</span>: {step.coachText?.slice(0, 50)}...
+                    <button onClick={() => setForm({ ...form, steps: form.steps?.filter((_, idx) => idx !== i) })} className="ml-2 text-red-400">Remove</button>
+                  </div>
+                ))}
+
+                <div className="p-3 bg-slate-900/50 rounded-lg space-y-2">
+                  <select value={currentStep.type || 'text'} onChange={e => setCurrentStep({ ...currentStep, type: e.target.value as LessonStep['type'] })}
+                    className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs">
+                    <option value="text">Text Step</option>
+                    <option value="quiz">Quiz Step</option>
+                    <option value="essay">Essay Step</option>
+                  </select>
+                  <textarea value={currentStep.coachText || ''} onChange={e => setCurrentStep({ ...currentStep, coachText: e.target.value })}
+                    placeholder="Coach text..." className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs" rows={2} />
+                  {currentStep.type === 'quiz' && (
+                    <>
+                      <textarea value={(currentStep as any).optionsText || ''} onChange={e => setCurrentStep({ ...currentStep, optionsText: e.target.value })}
+                        placeholder="Options (one per line)..." className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs" rows={2} />
+                      <input type="number" value={currentStep.correctIndex || 0} onChange={e => setCurrentStep({ ...currentStep, correctIndex: Number(e.target.value) })}
+                        placeholder="Correct index (0-based)" className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs" />
+                      <input value={currentStep.explanation || ''} onChange={e => setCurrentStep({ ...currentStep, explanation: e.target.value })}
+                        placeholder="Explanation..." className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs" />
+                    </>
+                  )}
+                  {currentStep.type === 'essay' && (
+                    <input value={currentStep.placeholder || ''} onChange={e => setCurrentStep({ ...currentStep, placeholder: e.target.value })}
+                      placeholder="Placeholder..." className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs" />
+                  )}
+                  <button onClick={addStep} className="w-full py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-xs rounded-lg">Add Step</button>
+                </div>
+              </div>
+            </>
           )}
+
+          {form.type === 'static' && (
+            <>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Content (EN) - Markdown</label>
+                <textarea value={form.content_en || ''} onChange={e => setForm({ ...form, content_en: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" rows={8} />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Content (VI) - Markdown</label>
+                <textarea value={form.content_vi || ''} onChange={e => setForm({ ...form, content_vi: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" rows={8} />
+              </div>
+              {form.content_en && (
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Preview (EN)</p>
+                  <div className="p-3 rounded-lg bg-slate-900/30 max-h-40 overflow-y-auto">
+                    <MarkdownRenderer content={form.content_en} className="text-sm" />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
           <div className="flex gap-2">
             <button onClick={saveForm} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-lg transition-all flex items-center gap-1">
               <Save size={14} /> {t('admin.save', language)}
@@ -186,29 +314,34 @@ function LessonsManager() {
       )}
 
       <div className="space-y-2">
-        {lessons.sort((a, b) => { if (a.level !== b.level) return a.level.localeCompare(b.level); return a.order - b.order; }).map(l => (
-          <div key={l.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 group">
+        {allLessons.sort((a, b) => { if (a.level !== b.level) return a.level.localeCompare(b.level); return a.order - b.order; }).map(l => (
+          <div key={l.id} className={`flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 group ${l.type === 'interactive' ? 'border-sky-500/20' : ''}`}>
             <div className="flex items-center gap-3 min-w-0">
-              <span className={`px-2 py-0.5 text-xs font-medium rounded-full shrink-0 ${
+              <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full shrink-0 ${
                 l.level === 'beginner' ? 'bg-green-500/20 text-green-400' :
                 l.level === 'intermediate' ? 'bg-yellow-500/20 text-yellow-400' :
                 'bg-red-500/20 text-red-400'
               }`}>{l.level.slice(0, 3)}</span>
+              <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full shrink-0 ${
+                l.type === 'interactive' ? 'bg-sky-500/20 text-sky-400' : 'bg-slate-500/20 text-slate-400'
+              }`}>{l.type}</span>
               <span className="text-sm text-white truncate">{language === 'vi' ? l.title_vi : l.title_en}</span>
               {l.pinned && <Pin size={12} className="text-orange-400 shrink-0" />}
             </div>
-             <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               <button onClick={() => moveLesson(l.id, 'up')} className="p-1.5 text-slate-400 hover:text-orange-400 transition-colors" title="Move Up">
                 <ArrowUp size={14} />
               </button>
               <button onClick={() => moveLesson(l.id, 'down')} className="p-1.5 text-slate-400 hover:text-orange-400 transition-colors" title="Move Down">
                 <ArrowDown size={14} />
               </button>
-              <button onClick={() => updateLesson(l.id, { pinned: !l.pinned })} className="p-1.5 text-slate-400 hover:text-orange-400 transition-colors" title={l.pinned ? 'Unpin' : 'Pin'}>
-                <Pin size={14} />
-              </button>
+              {l.type === 'static' && (
+                <button onClick={() => updateLesson(l.id, { pinned: !l.pinned })} className="p-1.5 text-slate-400 hover:text-orange-400 transition-colors" title={l.pinned ? 'Unpin' : 'Pin'}>
+                  <Pin size={14} />
+                </button>
+              )}
               <button onClick={() => startEdit(l)} className="p-1.5 text-slate-400 hover:text-blue-400 transition-colors"><Edit3 size={14} /></button>
-              <button onClick={() => deleteLesson(l.id)} className="p-1.5 text-slate-400 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
+              <button onClick={() => l.type === 'static' ? deleteLesson(l.id) : deleteInteractiveLesson(l.id)} className="p-1.5 text-slate-400 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
             </div>
           </div>
         ))}
@@ -284,7 +417,7 @@ function BotsManager() {
   };
 
   const startCreate = () => {
-    setForm({ id: 'bot_' + Date.now(), name: '', avatar: 'engine', bio_en: '', bio_vi: '', displayStrength: 5, hiddenPrompt: '', knowledge: 5, logic: 5, rebuttal: 5, vocabulary: 5, creativity: 5, confidence: 5 });
+    setForm({ id: 'bot_' + Date.now(), name: '', avatar: 'engine', bio_en: '', bio_vi: '', displayStrength: 5, hiddenPrompt: '', knowledge: 5, logic: 5, rebuttal: 5, vocabulary: 5, creativity: 5, confidence: 5, voice_style: 'default' });
     setCreating(true);
     setEditing(null);
   };
@@ -362,29 +495,53 @@ function BotsManager() {
             <textarea value={form.hiddenPrompt || ''} onChange={e => setForm({ ...form, hiddenPrompt: e.target.value })} rows={4}
               className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none font-mono" />
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-            {(['knowledge', 'logic', 'rebuttal', 'vocabulary', 'creativity', 'confidence'] as const).map(stat => (
-              <div key={stat}>
-                <label className="block text-xs text-slate-400 mb-1 capitalize">{stat}: {(form as Record<string, number>)[stat] || 5}</label>
-                <input type="range" min={1} max={10} value={(form as Record<string, number>)[stat] || 5}
-                  onChange={e => setForm({ ...form, [stat]: Number(e.target.value) })} className="w-full accent-orange-500" />
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <button onClick={saveForm} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-lg flex items-center gap-1"><Save size={14} /> Save</button>
-            <button onClick={cancel} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg flex items-center gap-1"><X size={14} /> Cancel</button>
-          </div>
-        </div>
-      )}
+<div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+             {(['knowledge', 'logic', 'rebuttal', 'vocabulary', 'creativity', 'confidence'] as const).map(stat => (
+               <div key={stat}>
+                 <label className="block text-xs text-slate-400 mb-1 capitalize">{stat}: {(form as Record<string, number>)[stat] || 5}</label>
+                 <input type="range" min={1} max={10} value={(form as Record<string, number>)[stat] || 5}
+                   onChange={e => setForm({ ...form, [stat]: Number(e.target.value) })} className="w-full accent-orange-500" />
+               </div>
+             ))}
+           </div>
+           <div>
+             <label className="block text-xs text-slate-400 mb-2">Voice Style</label>
+             <div className="flex gap-2">
+               {(['default', 'man', 'woman', 'boy', 'girl'] as const).map(style => (
+                 <button
+                   key={style}
+                   type="button"
+                   onClick={() => setForm({ ...form, voice_style: style })}
+                   className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                     (form.voice_style || 'default') === style
+                       ? 'bg-orange-500 text-white'
+                       : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
+                   }`}
+                 >
+                   {style === 'default' ? 'Default' : style.charAt(0).toUpperCase() + style.slice(1)}
+                 </button>
+               ))}
+             </div>
+           </div>
+           <div className="flex gap-2">
+             <button onClick={saveForm} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-lg flex items-center gap-1"><Save size={14} /> Save</button>
+             <button onClick={cancel} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg flex items-center gap-1"><X size={14} /> Cancel</button>
+           </div>
+         </div>
+       )}
 
-      <div className="space-y-2">
-        {bots.map(bot => (
-          <div key={bot.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 group">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="text-sm text-white font-medium">{bot.name}</span>
-              <span className="text-xs text-slate-400">Str: {bot.displayStrength}</span>
-            </div>
+       <div className="space-y-2">
+         {bots.map(bot => (
+           <div key={bot.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 group">
+             <div className="flex items-center gap-3 min-w-0">
+               <span className="text-sm text-white font-medium">{bot.name}</span>
+               <span className="text-xs text-slate-400">Str: {bot.displayStrength}</span>
+               {bot.voice_style && bot.voice_style !== 'default' && (
+                 <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
+                   {bot.voice_style}
+                 </span>
+               )}
+             </div>
              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button onClick={() => moveBot(bot.id, 'up')} className="p-1.5 text-slate-400 hover:text-orange-400" title="Move Up"><ArrowUp size={14} /></button>
               <button onClick={() => moveBot(bot.id, 'down')} className="p-1.5 text-slate-400 hover:text-orange-400" title="Move Down"><ArrowDown size={14} /></button>
@@ -870,37 +1027,180 @@ function AiKeysManager() {
 }
 
 function CreateAdmin() {
-  const { language, createAdminAccount } = useStore();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
-  const [msg, setMsg] = useState('');
+  const { language } = useStore();
+  const [scripts, setScripts] = useState<LessonScript[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState<Partial<LessonScript>>({ steps: [] });
+  const [currentStep, setCurrentStep] = useState<Partial<LessonStep> & { optionsText?: string }>({});
 
-  const handleCreate = async () => {
-    if (!email || !password || !username) return;
-    const res = await createAdminAccount(email, password, username);
-    if (res.success) {
-      setMsg(language === 'vi' ? 'Tạo tài khoản quản trị thành công!' : 'Admin account created successfully!');
-      setEmail(''); setPassword(''); setUsername('');
-    } else {
-      setMsg(res.error || (language === 'vi' ? 'Email đã tồn tại.' : 'Email already exists.'));
+  useEffect(() => {
+    const loadScripts = async () => {
+      try {
+        const res = await fetch('/api/admin/lessons');
+        if (res.ok) {
+          const data = await res.json();
+          setScripts(data.scripts || []);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    loadScripts();
+  }, []);
+
+  const addStep = () => {
+    if (!currentStep.coachText) return;
+    const newStep: LessonStep = {
+      id: 'step_' + Date.now(),
+      type: 'text',
+      coachText: currentStep.coachText || '',
+      nextId: null,
+    };
+    if ((currentStep as any).optionsText) {
+      newStep.type = 'quiz';
+      newStep.options = (currentStep as any).optionsText.split('\n').filter(Boolean);
+      newStep.correctIndex = currentStep.correctIndex ?? 0;
+      newStep.explanation = currentStep.explanation || '';
+    } else if (currentStep.placeholder) {
+      newStep.type = 'essay';
+      newStep.placeholder = currentStep.placeholder;
+    }
+    setForm({ ...form, steps: [...(form.steps || []), newStep] });
+    setCurrentStep({});
+  };
+
+  const saveScript = async () => {
+    if (!form.title || !form.xpReward) return;
+    const script: LessonScript = {
+      id: form.id || 'script_' + Date.now(),
+      title: form.title || '',
+      level: form.level || 'beginner',
+      description: form.description || '',
+      xpReward: form.xpReward || 50,
+      coachId: form.coachId || 'crab',
+      coachName: form.coachName || 'Coach Crab',
+      steps: form.steps || [],
+    };
+    try {
+      const res = await fetch('/api/admin/lessons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script }),
+      });
+      if (res.ok) {
+        setScripts([...scripts.filter(s => s.id !== script.id), script]);
+        setCreating(false);
+        setEditingId(null);
+        setForm({ steps: [] });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteScript = async (id: string) => {
+    try {
+      await fetch(`/api/admin/lessons/${id}`, { method: 'DELETE' });
+      setScripts(scripts.filter(s => s.id !== id));
+    } catch (e) {
+      console.error(e);
     }
   };
 
   return (
-    <div className="max-w-md">
-      <h2 className="text-lg font-semibold text-white mb-4">{t('admin.create_admin', language)}</h2>
-      {msg && <div className="p-3 mb-4 bg-orange-500/10 border border-orange-500/30 rounded-lg text-orange-400 text-sm">{msg}</div>}
-      <div className="space-y-3">
-        <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="Username"
-          className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email"
-          className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password"
-          className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
-        <button onClick={handleCreate} className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-all">
-          {t('admin.create_admin', language)}
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-white">Interactive Lessons ({scripts.length})</h2>
+        <button onClick={() => { setCreating(true); setEditingId(null); setForm({ steps: [] }); }} className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-lg">
+          <Plus size={14} /> Create Lesson
         </button>
+      </div>
+
+      {(creating || editingId) && (
+        <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-5 mb-6 space-y-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Title (EN)</label>
+              <input type="text" value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">XP Reward</label>
+              <input type="number" value={form.xpReward || 50} onChange={e => setForm({ ...form, xpReward: Number(e.target.value) })}
+                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Coach ID</label>
+            <select value={form.coachId || 'crab'} onChange={e => setForm({ ...form, coachId: e.target.value })}
+              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm">
+              <option value="crab">Coach Crab</option>
+              <option value="duy">Duy</option>
+              <option value="thai">Thai</option>
+              <option value="han">Han</option>
+              <option value="bach">Bach</option>
+              <option value="dung">Dung</option>
+              <option value="tom">Tom</option>
+            </select>
+          </div>
+
+          <div className="border-t border-slate-700 pt-4">
+            <h3 className="text-sm font-semibold text-white mb-2">Steps Builder</h3>
+            {(form.steps || []).map((step, i) => (
+              <div key={step.id} className="p-2 mb-2 bg-slate-900/30 rounded-lg text-xs text-slate-300">
+                <span className="font-semibold">{i + 1}. {step.type}</span>: {step.coachText?.slice(0, 50)}...
+                <button onClick={() => setForm({ ...form, steps: form.steps?.filter((_, idx) => idx !== i) })} className="ml-2 text-red-400">Remove</button>
+              </div>
+            ))}
+
+            <div className="p-3 bg-slate-900/50 rounded-lg space-y-2">
+              <select value={currentStep.type || 'text'} onChange={e => setCurrentStep({ ...currentStep, type: e.target.value as LessonStep['type'] })}
+                className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs">
+                <option value="text">Text Step</option>
+                <option value="quiz">Quiz Step</option>
+                <option value="essay">Essay Step</option>
+              </select>
+              <textarea value={currentStep.coachText || ''} onChange={e => setCurrentStep({ ...currentStep, coachText: e.target.value })}
+                placeholder="Coach text..." className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs" rows={2} />
+              {currentStep.type === 'quiz' && (
+                <>
+                  <textarea value={(currentStep as any).optionsText || ''} onChange={e => setCurrentStep({ ...currentStep, optionsText: e.target.value })}
+                    placeholder="Options (one per line)..." className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs" rows={2} />
+                  <input type="number" value={currentStep.correctIndex || 0} onChange={e => setCurrentStep({ ...currentStep, correctIndex: Number(e.target.value) })}
+                    placeholder="Correct index (0-based)" className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs" />
+                  <input value={currentStep.explanation || ''} onChange={e => setCurrentStep({ ...currentStep, explanation: e.target.value })}
+                    placeholder="Explanation..." className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs" />
+                </>
+              )}
+              {currentStep.type === 'essay' && (
+                <input value={currentStep.placeholder || ''} onChange={e => setCurrentStep({ ...currentStep, placeholder: e.target.value })}
+                  placeholder="Placeholder..." className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs" />
+              )}
+              <button onClick={addStep} className="w-full py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-xs rounded-lg">Add Step</button>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button onClick={saveScript} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-lg flex items-center gap-1"><Save size={14} /> Save</button>
+            <button onClick={() => { setCreating(false); setEditingId(null); setForm({ steps: [] }); }} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg flex items-center gap-1"><X size={14} /> Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {scripts.map(script => (
+          <div key={script.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 group">
+            <div className="min-w-0">
+              <p className="text-sm text-white font-medium truncate">{script.title}</p>
+              <p className="text-xs text-slate-500">{script.steps.length} steps | +{script.xpReward} XP</p>
+            </div>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => { setEditingId(script.id); setCreating(true); setForm(script); }} className="p-1.5 text-slate-400 hover:text-blue-400"><Edit3 size={14} /></button>
+              <button onClick={() => deleteScript(script.id)} className="p-1.5 text-slate-400 hover:text-red-400"><Trash2 size={14} /></button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

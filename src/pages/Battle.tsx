@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shuffle, Play, Send, Lightbulb, Star, Clock, ChevronLeft, Trophy, Activity, CheckCircle2, Mic, MicOff } from 'lucide-react';
+import { Shuffle, Play, Send, Lightbulb, Star, Clock, ChevronLeft, Trophy, Activity, CheckCircle2, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import { callOpenRouterWithRetry, buildDebateSystemPrompt, buildJudgePrompt, buildHintPrompt } from '../api';
@@ -348,6 +348,12 @@ export default function Battle() {
   const [enableTimer, setEnableTimer] = useState(false);
   const [notesMd, setNotesMd] = useState(false);
   const [earnedStars, setEarnedStars] = useState<number | null>(null);
+  const [rounds, setRounds] = useState(3);
+  const [endlessMode, setEndlessMode] = useState(false);
+  const [userSpeeches, setUserSpeeches] = useState(0);
+  const [aiSpeeches, setAiSpeeches] = useState(0);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceStyle, setVoiceStyle] = useState('default');
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -504,6 +510,10 @@ export default function Battle() {
     setNotes('');
     setNotesMd(false);
     setHintsUsed(0);
+    setUserSpeeches(0);
+    setAiSpeeches(0);
+    setEarnedStars(null);
+    setJudgment('');
     setTimeRemaining(speechTime * 60);
     setTimerRunning(false);
 
@@ -546,6 +556,7 @@ export default function Battle() {
     setCurrentTurn('ai');
     setIsLoading(true);
     setRound(prev => prev + 1);
+    setUserSpeeches(prev => prev + 1);
 
     const sysPrompt = buildDebateSystemPrompt(
       isCustomEngine ? null : selectedBot,
@@ -572,6 +583,7 @@ export default function Battle() {
     setIsLoading(false);
     setCurrentTurn('user');
     setTimeRemaining(speechTime * 60);
+    setAiSpeeches(prev => prev + 1);
   };
 
   const submitSpeechRef = useRef(submitSpeech);
@@ -675,6 +687,13 @@ export default function Battle() {
                         <div className="min-w-0">
                           <p className="text-xs font-medium text-white truncate">{bot.name}</p>
                           <p className="text-[10px] text-slate-400">Str: {bot.displayStrength}</p>
+                          {stars > 0 && (
+                            <div className="flex gap-0.5 mt-0.5">
+                              {[1, 2, 3].map(s => (
+                                <span key={s} className={`text-[10px] ${s <= stars ? 'text-orange-400' : 'text-slate-600'}`}>★</span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </button>
@@ -808,70 +827,84 @@ export default function Battle() {
                 )}
               </div>
 
-              {/* Side / Speaker / Prep / Language */}
-              <div className="grid grid-cols-2 gap-2">
+{/* Prep Time + Rounds Combined */}
                 <div className="p-3 rounded-xl bg-slate-900/30 border border-white/[0.06]">
-                  <label className="text-[10px] text-slate-500 mb-1.5 block">{t('battle.side', language)}</label>
-                  <div className="flex gap-1">
-                    {(['for', 'against'] as const).map(s => (
-                      <button key={s} onClick={() => setSide(s)}
-                        className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${side === s ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
-                        {t(`battle.${s}`, language)}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] text-slate-500 mb-1 block">{t('battle.prep_time', language)}: {prepTime} {t('common.minutes', language)}</label>
+                      <input type="range" min={0} max={5} value={prepTime} onChange={e => setPrepTime(Number(e.target.value))} className="w-full accent-orange-500 h-1" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 mb-1 block">{language === 'vi' ? 'Số vòng' : 'Rounds'}: {rounds >= 10 ? (language === 'vi' ? 'Vô hạn' : 'Endless') : rounds}</label>
+                      <input type="range" min={1} max={10} value={rounds} onChange={e => { const v = Number(e.target.value); setRounds(v); setEndlessMode(v >= 10); }} className="w-full accent-orange-500 h-1" />
+                    </div>
                   </div>
                 </div>
-                <div className="p-3 rounded-xl bg-slate-900/30 border border-white/[0.06]">
-                  <label className="text-[10px] text-slate-500 mb-1.5 block">{t('battle.speaker', language)}</label>
-                  <div className="flex gap-1">
-                    {(['1st', '2nd'] as const).map(o => (
-                      <button key={o} onClick={() => setSpeakerOrder(o)}
-                        className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${speakerOrder === o ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
-                        {o}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-900/30 border border-white/[0.06]">
-                  <label className="text-[10px] text-slate-500 mb-1.5 block">{t('battle.prep_time', language)}: {prepTime} {t('common.minutes', language)}</label>
-                  <input type="range" min={0} max={5} value={prepTime} onChange={e => setPrepTime(Number(e.target.value))} className="w-full accent-orange-500 h-1" />
-                </div>
-                <div className="p-3 rounded-xl bg-slate-900/30 border border-white/[0.06]">
-                  <label className="text-[10px] text-slate-500 mb-1.5 block">{t('battle.language', language)}</label>
-                  <div className="flex gap-1">
-                    {(['en', 'vi'] as const).map(l => (
-                      <button key={l} onClick={() => setDebateLang(l)}
-                        className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${debateLang === l ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
-                        {l === 'en' ? 'EN' : 'VI'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
 
-              <button
-                onClick={startDebate}
-                disabled={(!useCustomMotion && !motion_) || (useCustomMotion && !customMotion) || (!selectedBot && !isCustomEngine) || !aiConfigured}
-                className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-orange-500/20"
-              >
-                <Play size={16} className="inline mr-2" />
-                {t('battle.start', language)}
-              </button>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
+               {/* Speaker Order + Language Combined */}
+               <div className="p-3 rounded-xl bg-slate-900/30 border border-white/[0.06]">
+                 <div className="grid grid-cols-2 gap-3">
+                   <div>
+                     <label className="text-[10px] text-slate-500 mb-1 block">{t('battle.speaker', language)}</label>
+                     <div className="flex gap-1">
+                       {(['1st', '2nd'] as const).map(o => (
+                         <button key={o} onClick={() => setSpeakerOrder(o)}
+                           className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${speakerOrder === o ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                           {o}
+                         </button>
+                       ))}
+                     </div>
+                   </div>
+                   <div>
+                     <label className="text-[10px] text-slate-500 mb-1 block">{t('battle.language', language)}</label>
+                     <div className="flex gap-1">
+                       {(['en', 'vi'] as const).map(l => (
+                         <button key={l} onClick={() => setDebateLang(l)}
+                           className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${debateLang === l ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                           {l === 'en' ? 'EN' : 'VI'}
+                         </button>
+                       ))}
+                     </div>
+                   </div>
+                 </div>
+               </div>
+
+               {/* Side (For/Against) - Bottom */}
+               <div className="p-3 rounded-xl bg-slate-900/30 border border-white/[0.06]">
+                 <label className="text-[10px] text-slate-500 mb-1.5 block">{t('battle.side', language)}</label>
+                 <div className="flex gap-1">
+                   {(['for', 'against'] as const).map(s => (
+                     <button key={s} onClick={() => setSide(s)}
+                       className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${side === s ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                       {t(`battle.${s}`, language)}
+                     </button>
+                   ))}
+                 </div>
+               </div>
+
+               <button
+                 onClick={startDebate}
+                 disabled={(!useCustomMotion && !motion_) || (useCustomMotion && !customMotion) || (!selectedBot && !isCustomEngine) || !aiConfigured}
+                 className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-orange-500/20"
+               >
+                 <Play size={16} className="inline mr-2" />
+                 {t('battle.start', language)}
+               </button>
+             </div>
+           </div>
+         </motion.div>
+       </div>
+     );
+   }
 
   // DEBATE / JUDGING / FINISHED PHASE
   const motionText = motion_ ? (debateLang === 'vi' ? motion_.motion_vi : motion_.motion_en) : '';
   const botName = isCustomEngine ? 'Engine' : (selectedBot?.name || 'AI');
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col h-[calc(100vh-4.5rem)] overflow-hidden">
+    <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col h-[calc(100vh-4.5rem)] overflow-hidden">
       {/* Premium HUD Banner */}
-      <div className="relative overflow-hidden mb-5 p-4 rounded-2xl bg-white/70 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800/80 backdrop-blur-md shadow-sm flex flex-wrap items-center justify-between gap-4">
+      <div className="relative overflow-hidden mb-3 p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800/80 backdrop-blur-md shadow-sm flex flex-wrap items-center justify-between gap-3">
         <div className="absolute top-0 left-0 w-1 bg-gradient-to-b from-orange-500 to-amber-500 h-full" />
         
         <div className="flex items-center gap-3 min-w-0">
@@ -880,18 +913,21 @@ export default function Battle() {
             className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-all shrink-0"
             title={language === 'vi' ? 'Quay lại thiết lập' : 'Back to setup'}
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={18} />
           </button>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[10px] font-bold text-orange-500 dark:text-orange-400 uppercase tracking-widest bg-orange-500/10 px-2 py-0.5 rounded-full">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="text-[10px] font-bold text-orange-500 dark:text-orange-400 uppercase tracking-widest bg-orange-500/10 px-1.5 py-0.5 rounded-full">
                 {motion_?.category ? categoryLabel(motion_.category) : 'Debate'}
               </span>
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
                 {t(`battle.${difficulty}`, language)}
               </span>
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
+                {language === 'vi' ? `Vòng ${round}/${rounds}` : `Round ${round}/${rounds}`}
+              </span>
             </div>
-            <h2 className="text-sm md:text-base text-slate-800 dark:text-white font-semibold leading-snug" title={motionText}>
+            <h2 className="text-xs md:text-sm text-slate-800 dark:text-white font-semibold leading-snug truncate" title={motionText}>
               {motionText}
             </h2>
           </div>
@@ -973,20 +1009,40 @@ export default function Battle() {
           {/* Chat Arena or Scorecard Container - standardized scrollable area */}
           <div className="flex-1 bg-white/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 overflow-y-auto mb-4 min-h-0 shadow-sm scrollbar-thin">
             {phase === 'finished' && judgment ? (
-              <JudgmentScorecard 
-                judgmentText={judgment} 
-                language={debateLang} 
-                onNewBattle={() => setPhase('setup')}
-                earnedStars={earnedStars}
-                isCustomEngine={isCustomEngine}
-                userWon={(() => {
-                  const parsed = parseJudgment(judgment);
-                  const totalRow = parsed.scores.find(s => s.criteria.toLowerCase().includes('total') || s.criteria.toLowerCase().includes('tổng'));
-                  const byName = parsed.winner.toLowerCase().includes('user') || parsed.winner.toLowerCase().includes('người dùng');
-                  const byScore = !!totalRow && totalRow.user > totalRow.opponent;
-                  return byName || byScore;
-                })()}
-              />
+              <div className="space-y-6">
+                <JudgmentScorecard 
+                  judgmentText={judgment} 
+                  language={debateLang} 
+                  onNewBattle={() => setPhase('setup')}
+                  earnedStars={earnedStars}
+                  isCustomEngine={isCustomEngine}
+                  userWon={(() => {
+                    const parsed = parseJudgment(judgment);
+                    const totalRow = parsed.scores.find(s => s.criteria.toLowerCase().includes('total') || s.criteria.toLowerCase().includes('tổng'));
+                    const byName = parsed.winner.toLowerCase().includes('user') || parsed.winner.toLowerCase().includes('người dùng');
+                    const byScore = !!totalRow && totalRow.user > totalRow.opponent;
+                    return byName || byScore;
+                  })()}
+                />
+                <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                    {language === 'vi' ? 'Transcript trận đấu' : 'Debate Transcript'}
+                  </h3>
+                  <div className="space-y-4">
+                    {messages.map((msg, i) => (
+                      <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[85%] md:max-w-[75%] px-4 py-2.5 rounded-2xl ${
+                          msg.role === 'user'
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200'
+                        }`}>
+                          <MarkdownRenderer content={msg.content} className={`text-sm ${msg.role === 'user' ? 'text-white' : ''}`} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             ) : phase === 'judging' ? (
               <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
                 <div className="p-5 bg-orange-500/10 rounded-full border border-orange-500/20 text-orange-500 dark:text-orange-400 animate-bounce">
@@ -1049,8 +1105,8 @@ export default function Battle() {
                                 content={msg.content} 
                                 className={`text-sm ${msg.role === 'user' ? 'prose-p:text-white dark:prose-p:text-slate-100 prose-headings:text-white prose-strong:text-white prose-ol:text-white prose-ul:text-white' : ''}`} 
                               />
-                            </div>
-                          </div>
+                </div>
+              </div>
                         )}
                       </motion.div>
                     ))}
@@ -1082,56 +1138,62 @@ export default function Battle() {
 
           {/* Controls - Sticky at bottom */}
           {phase === 'debate' && (
-            <div className="space-y-2 shrink-0">
-              {enableTimer && currentTurn === 'user' && !timerRunning && !isLoading && (
-                <button
-                  onClick={() => { setTimerRunning(true); }}
-                  className="w-full py-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 text-xs font-bold rounded-xl transition-all border border-orange-500/20 flex items-center justify-center gap-2"
-                >
-                  <Play size={13} fill="currentColor" /> {t('battle.start_timer', language)}
-                </button>
-              )}
+              <div className="space-y-2 shrink-0">
+                {enableTimer && currentTurn === 'user' && !timerRunning && !isLoading && (
+                  <button
+                    onClick={() => { setTimerRunning(true); }}
+                    className="w-full py-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 text-xs font-bold rounded-xl transition-all border border-orange-500/20 flex items-center justify-center gap-2"
+                  >
+                    <Play size={13} fill="currentColor" /> {t('battle.start_timer', language)}
+                  </button>
+                )}
 
-              <div className="flex gap-2">
-                <textarea
-                  value={inputText}
-                  onChange={e => {
-                    setInputText(e.target.value);
-                    if (enableTimer && !timerRunning && timeRemaining > 0 && currentTurn === 'user' && !isLoading) {
-                      setTimerRunning(true);
-                    }
-                  }}
-                  placeholder={currentTurn === 'user'
-                    ? (language === 'vi' ? 'Nhập phát biểu của bạn tại đây...' : 'Type your speech here...')
-                    : (language === 'vi' ? 'Đang chờ bài nói của đối thủ AI...' : 'Waiting for AI opponent to speak...')}
-                  disabled={currentTurn !== 'user' || isLoading}
-                  className="flex-1 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-white text-sm placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50 resize-none disabled:opacity-50"
-                  rows={3}
-                  onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) submitSpeech(); }}
-                />
-                <div className="flex flex-col gap-1.5">
-                  <button
-                    onClick={() => submitSpeech()}
-                    disabled={!inputText.trim() || currentTurn !== 'user' || isLoading}
-                    className="flex-1 px-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-all disabled:opacity-50 shadow-sm hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1.5 text-sm font-medium"
-                  >
-                    <Send size={16} />
-                    {t('battle.submit', language)}
-                  </button>
-                  <button
-                    onClick={toggleListening}
-                    disabled={currentTurn !== 'user' || isLoading}
-                    className={`flex-1 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 text-sm font-medium ${
-                      isListening
-                        ? 'bg-red-500 hover:bg-red-600 text-white border border-red-500 animate-pulse'
-                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
-                    }`}
-                  >
-                    {isListening ? <MicOff size={16} /> : <Mic size={16} />}
-                    {language === 'vi' ? 'Ghi âm' : 'Record'}
-                  </button>
+                {!endlessMode && userSpeeches >= rounds && aiSpeeches >= rounds && (
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium text-center">
+                    {language === 'vi' ? 'Đã kết thúc tất cả các vòng. Bạn có thể kết thúc trận đấu.' : 'All rounds completed. You can end the debate.'}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <textarea
+                    value={inputText}
+                    onChange={e => {
+                      setInputText(e.target.value);
+                      if (enableTimer && !timerRunning && timeRemaining > 0 && currentTurn === 'user' && !isLoading) {
+                        setTimerRunning(true);
+                      }
+                    }}
+                    placeholder={currentTurn === 'user'
+                      ? (language === 'vi' ? 'Nhập phát biểu của bạn tại đây...' : 'Type your speech here...')
+                      : (language === 'vi' ? 'Đang chờ bài nói của đối thủ AI...' : 'Waiting for AI opponent to speak...')}
+                    disabled={currentTurn !== 'user' || isLoading || (!endlessMode && userSpeeches >= rounds && aiSpeeches >= rounds)}
+                    className="flex-1 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-white text-sm placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50 resize-none disabled:opacity-50"
+                    rows={3}
+                    onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) submitSpeech(); }}
+                  />
+                  <div className="flex flex-col gap-1.5">
+                    <button
+                      onClick={() => submitSpeech()}
+                      disabled={!inputText.trim() || currentTurn !== 'user' || isLoading || (!endlessMode && userSpeeches >= rounds && aiSpeeches >= rounds)}
+                      className="flex-1 px-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-all disabled:opacity-50 shadow-sm hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1.5 text-sm font-medium"
+                    >
+                      <Send size={16} />
+                      {t('battle.submit', language)}
+                    </button>
+                    <button
+                      onClick={toggleListening}
+                      disabled={currentTurn !== 'user' || isLoading}
+                      className={`flex-1 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 text-sm font-medium ${
+                        isListening
+                          ? 'bg-red-500 hover:bg-red-600 text-white border border-red-500 animate-pulse'
+                          : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
+                      }`}
+                    >
+                      {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                      {language === 'vi' ? 'Ghi âm' : 'Record'}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
               {isListening && (
                 <div className="text-xs text-orange-400 italic px-3 py-2 bg-orange-500/5 rounded-lg flex items-center gap-2">
@@ -1144,29 +1206,42 @@ export default function Battle() {
                 </div>
               )}
 
-              <div className="flex justify-between items-center px-1">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={requestHint}
-                    disabled={isLoading}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-yellow-600 dark:text-yellow-400 border border-slate-200 dark:border-slate-800 rounded-lg transition-all disabled:opacity-50 flex items-center gap-1.5 text-xs font-semibold"
-                  >
-                    <Lightbulb size={14} />
-                    {t('battle.hint', language)}
-                  </button>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">
-                    {language === 'vi'
-                      ? `Đã dùng ${hintsUsed} gợi ý`
-                      : `Hints used: ${hintsUsed}`}
-                  </p>
+                <div className="flex justify-between items-center px-1">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={requestHint}
+                      disabled={isLoading}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-yellow-600 dark:text-yellow-400 border border-slate-200 dark:border-slate-800 rounded-lg transition-all disabled:opacity-50 flex items-center gap-1.5 text-xs font-semibold"
+                    >
+                      <Lightbulb size={14} />
+                      {t('battle.hint', language)}
+                    </button>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                      {language === 'vi'
+                        ? `Đã dùng ${hintsUsed} gợi ý`
+                        : `Hints used: ${hintsUsed}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setVoiceEnabled(!voiceEnabled)}
+                      className={`p-1.5 rounded-lg border transition-all flex items-center justify-center ${
+                        voiceEnabled
+                          ? 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400'
+                          : 'bg-slate-100 dark:bg-slate-850 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}
+                      title={language === 'vi' ? 'Bật/tắt giọng nói' : 'Toggle voice'}
+                    >
+                      {voiceEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                    </button>
+                    <button
+                      onClick={endDebate}
+                      className="px-4 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-650 dark:text-red-400 text-xs font-semibold rounded-lg border border-red-500/20 transition-all"
+                    >
+                      {t('battle.end_debate', language)}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={endDebate}
-                  className="px-4 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-650 dark:text-red-400 text-xs font-semibold rounded-lg border border-red-500/20 transition-all"
-                >
-                  {t('battle.end_debate', language)}
-                </button>
-              </div>
             </div>
           )}
         </div>

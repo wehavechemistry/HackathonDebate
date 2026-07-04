@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { User, Lesson, Topic, BotPersonality, DebateMotion, Announcement, AiApiKey, Post, Reply, VoteResult } from './types';
+import type { User, Lesson, Topic, BotPersonality, DebateMotion, Announcement, AiApiKey, Post, Reply, VoteResult, LessonScript } from './types';
 import { loadPrompts } from './prompts';
 
 interface AppState {
@@ -41,6 +41,9 @@ interface AppState {
   addLesson: (lesson: Lesson) => Promise<void>;
   updateLesson: (id: string, updates: Partial<Lesson>) => Promise<void>;
   deleteLesson: (id: string) => Promise<void>;
+  addInteractiveLesson: (script: LessonScript) => Promise<void>;
+  updateInteractiveLesson: (id: string, updates: Partial<LessonScript>) => Promise<void>;
+  deleteInteractiveLesson: (id: string) => Promise<void>;
   
   addTopic: (topic: Topic) => Promise<void>;
   updateTopic: (id: string, updates: Partial<Topic>) => Promise<void>;
@@ -57,7 +60,7 @@ interface AppState {
   addAnnouncement: (a: Announcement) => Promise<void>;
   deleteAnnouncement: (id: string) => Promise<void>;
   
-  completeLesson: (lessonId: string) => Promise<void>;
+  completeLesson: (lessonId: string, xpReward?: number) => Promise<void>;
   addActivity: (activity: { type: 'lesson' | 'battle' | 'training' | 'prep'; title: string; detail?: string }) => Promise<void>;
   clearActivity: () => Promise<void>;
   addNote: (title: string, content: string) => Promise<void>;
@@ -68,28 +71,28 @@ interface AppState {
   updateStreak: () => Promise<void>;
   penalizeTraining: (xp: number) => Promise<void>;
   fetchUsers: () => Promise<void>;
-isLessonUnlocked: (lessonId: string) => boolean;
-   getNextLesson: (lessonId: string) => Lesson | null;
-   
-    fetchPosts: (page?: number, limit?: number, language?: string) => Promise<{ posts: Post[]; total: number }>;
-    createPost: (title_en: string, title_vi: string, content_en: string, content_vi: string, language: string, category?: string) => Promise<boolean>;
-    fetchReplies: (postId: string) => Promise<Reply[]>;
-    createReply: (postId: string, content_en: string, content_vi: string, parent_id?: string, language?: string) => Promise<boolean>;
-    votePost: (postId: string, vote: 1 | -1) => Promise<VoteResult>;
-    voteReply: (replyId: string, vote: 1 | -1) => Promise<VoteResult>;
-    voteAnnouncement: (announcementId: string, vote: 1 | -1) => Promise<VoteResult>;
-    deletePost: (postId: string) => Promise<boolean>;
-    updatePost: (postId: string, updates: Partial<Post>) => Promise<boolean>;
-    updateAnnouncement: (announcementId: string, updates: { title_en?: string; title_vi?: string; content_en?: string; content_vi?: string }) => Promise<boolean>;
-    changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
-    reorderLessons: (ids: string[]) => Promise<boolean>;
-    reorderBots: (ids: string[]) => Promise<boolean>;
-    reorderTopics: (ids: string[]) => Promise<boolean>;
-    deleteUser: (userId: string) => Promise<boolean>;
-    refreshContent: () => Promise<void>;
-    fetchPrompts: () => Promise<Record<string, { key: string; content_en: string; content_vi: string }>>;
-    updatePrompt: (key: string, content_en: string, content_vi: string) => Promise<boolean>;
-  }
+ isLessonUnlocked: (lessonId: string) => boolean;
+    getNextLesson: (lessonId: string) => Lesson | null;
+    
+     fetchPosts: (page?: number, limit?: number, language?: string) => Promise<{ posts: Post[]; total: number }>;
+     createPost: (title_en: string, title_vi: string, content_en: string, content_vi: string, language: string, category?: string) => Promise<boolean>;
+     fetchReplies: (postId: string) => Promise<Reply[]>;
+     createReply: (postId: string, content_en: string, content_vi: string, parent_id?: string, language?: string) => Promise<boolean>;
+     votePost: (postId: string, vote: 1 | -1) => Promise<VoteResult>;
+     voteReply: (replyId: string, vote: 1 | -1) => Promise<VoteResult>;
+     voteAnnouncement: (announcementId: string, vote: 1 | -1) => Promise<VoteResult>;
+     deletePost: (postId: string) => Promise<boolean>;
+     updatePost: (postId: string, updates: Partial<Post>) => Promise<boolean>;
+     updateAnnouncement: (announcementId: string, updates: { title_en?: string; title_vi?: string; content_en?: string; content_vi?: string }) => Promise<boolean>;
+     changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+     reorderLessons: (ids: string[]) => Promise<boolean>;
+     reorderBots: (ids: string[]) => Promise<boolean>;
+     reorderTopics: (ids: string[]) => Promise<boolean>;
+     deleteUser: (userId: string) => Promise<boolean>;
+     refreshContent: () => Promise<void>;
+     fetchPrompts: () => Promise<Record<string, { key: string; content_en: string; content_vi: string }>>;
+     updatePrompt: (key: string, content_en: string, content_vi: string) => Promise<boolean>;
+   }
 
 const STORAGE_KEY = 'debatecrab_config';
 
@@ -127,11 +130,11 @@ export const useStore = create<AppState>((set, get) => ({
   announcements: [],
   aiConfigured: false,
   apiModel: 'openrouter/auto',
-aiKeys: [],
-   isLoading: true,
-   posts: [],
-   replies: [],
-   currentPostId: null,
+  aiKeys: [],
+  isLoading: true,
+  posts: [],
+  replies: [],
+  currentPostId: null,
 
    initApp: async () => {
     try {
@@ -154,8 +157,9 @@ aiKeys: [],
       const contentRes = await fetch('/api/content');
       const contentData = await contentRes.json();
       if (contentData) {
+        const normalize = (list: any[]): Lesson[] => (list || []).map(l => ({ ...l, type: l.type || 'static' }));
         set({
-          lessons: contentData.lessons || [],
+          lessons: normalize(contentData.lessons),
           topics: contentData.topics || [],
           bots: contentData.bots || [],
           motions: contentData.motions || [],
@@ -176,8 +180,9 @@ aiKeys: [],
       const contentRes = await fetch('/api/content');
       const contentData = await contentRes.json();
       if (contentData) {
+        const normalize = (list: any[]): Lesson[] => (list || []).map(l => ({ ...l, type: l.type || 'static' }));
         set({
-          lessons: contentData.lessons || [],
+          lessons: normalize(contentData.lessons),
           topics: contentData.topics || [],
           bots: contentData.bots || [],
           motions: contentData.motions || [],
@@ -341,6 +346,63 @@ aiKeys: [],
       const res = await fetch(`/api/lessons/${id}`, { method: 'DELETE' });
       if (res.ok) {
         set({ lessons: get().lessons.filter(l => l.id !== id) });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  },
+
+  addInteractiveLesson: async (script) => {
+    try {
+      const lesson: Lesson = {
+        id: script.id || 'script_' + Date.now(),
+        type: 'interactive',
+        level: script.level || 'beginner',
+        title_en: script.title,
+        title_vi: script.title,
+        content_en: '',
+        content_vi: '',
+        order: 0,
+        pinned: false,
+        description: script.description,
+        xpReward: script.xpReward,
+        coachId: script.coachId,
+        coachName: script.coachName,
+        steps: script.steps,
+      };
+      const res = await fetch('/api/admin/lessons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script }),
+      });
+      if (res.ok) {
+        set({ lessons: [...get().lessons, lesson] });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  },
+
+  updateInteractiveLesson: async (id, updates) => {
+    try {
+      const res = await fetch(`/api/admin/lessons/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      });
+      if (res.ok) {
+        set({ lessons: get().lessons.map(s => (s as any).id === id ? { ...s, ...updates, type: 'interactive' as const } : s) });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  },
+
+  deleteInteractiveLesson: async (id) => {
+    try {
+      const res = await fetch(`/api/admin/lessons/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        set({ lessons: get().lessons.filter((l: any) => l.id !== id) });
       }
     } catch (e) {
       console.error(e);
@@ -869,13 +931,14 @@ unbanUser: async (userId) => {
     }
   },
 
-  completeLesson: async (lessonId) => {
+  completeLesson: async (lessonId, xpReward = 0) => {
     const state = get();
     if (!state.currentUser) return;
     if (state.currentUser.completedLessons.includes(lessonId)) return;
     const updated = {
       ...state.currentUser,
       completedLessons: [...state.currentUser.completedLessons, lessonId],
+      totalXp: (state.currentUser.totalXp || 0) + xpReward,
     };
     await state.updateCurrentUser(updated);
   },

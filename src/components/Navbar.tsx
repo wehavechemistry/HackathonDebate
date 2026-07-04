@@ -1,10 +1,27 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Sun, Moon, Globe, User, LogOut, Settings, Shield, LayoutDashboard, UserCircle, Wrench, Sparkles } from 'lucide-react';
+import { Menu, X, Sun, Moon, User, LogOut, Settings, Shield, LayoutDashboard, UserCircle, Wrench, Sparkles, Home, BookOpen, Swords, Dumbbell, FileText, FolderOpen, Users, Megaphone } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import CoachCrab from './CoachCrab';
+
+const iconMap: Record<string, any> = {
+  home: Home,
+  book: BookOpen,
+  swords: Swords,
+  dumbbell: Dumbbell,
+  'file-text': FileText,
+  'folder-open': FolderOpen,
+  users: Users,
+  megaphone: Megaphone,
+};
+
+function NavIcon({ name }: { name: string }) {
+  const Icon = iconMap[name];
+  if (!Icon) return null;
+  return <Icon size={16} />;
+}
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -15,14 +32,14 @@ export default function Navbar() {
   const isDark = theme === 'dark';
 
   const navLinks = [
-    { to: '/', label: t('nav.home', language) },
-    { to: '/learn', label: t('nav.learn', language) },
-    { to: '/battle', label: t('nav.battle', language) },
-    { to: '/training', label: t('nav.training', language) },
-    { to: '/prep', label: t('nav.prepare', language) },
-    { to: '/topics', label: t('nav.topics', language) },
-    { to: '/community', label: t('nav.community', language) },
-    { to: '/announcements', label: t('nav.announcements', language) },
+    { to: '/', label: t('nav.home', language), icon: 'home' },
+    { to: '/learn', label: t('nav.learn', language), icon: 'book' },
+    { to: '/battle', label: t('nav.battle', language), icon: 'swords' },
+    { to: '/training', label: t('nav.training', language), icon: 'dumbbell' },
+    { to: '/prep', label: t('nav.prepare', language), icon: 'file-text' },
+    { to: '/topics', label: t('nav.topics', language), icon: 'folder-open' },
+    { to: '/community', label: t('nav.community', language), icon: 'users' },
+    { to: '/announcements', label: t('nav.announcements', language), icon: 'megaphone' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -44,14 +61,14 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-1">
             {navLinks.map(link => {
               const active = isActive(link.to);
               return (
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`relative px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  className={`relative px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${
                     active
                       ? `${linkActive}`
                       : `${linkBase} ${linkHover}`
@@ -64,6 +81,7 @@ export default function Navbar() {
                       transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                     />
                   )}
+                  <NavIcon name={link.icon || ''} />
                   {link.label}
                 </Link>
               );
@@ -72,14 +90,28 @@ export default function Navbar() {
 
           {/* Right Side */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={toggleLanguage}
-              className={`p-2 rounded-lg transition-all cursor-pointer ${isDark ? 'text-[#9494a8] hover:text-white hover:bg-white/5' : 'text-slate-500 hover:text-slate-900 hover:bg-black/5'}`}
-              title={language === 'en' ? 'Switch to Vietnamese' : 'Chuyển sang Tiếng Anh'}
-            >
-              <Globe size={18} />
-              <span className={`ml-1 text-xs font-semibold ${isDark ? 'text-[#9494a8]' : 'text-slate-500'}`}>{language.toUpperCase()}</span>
-            </button>
+            <div className={`flex items-center rounded-lg p-1 ${isDark ? 'bg-white/5' : 'bg-black/5'}`}>
+              <button
+                onClick={() => language !== 'en' ? toggleLanguage() : undefined}
+                className={`px-2 py-1 rounded-md text-xs font-bold transition-all ${
+                  language === 'en'
+                    ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-orange-500/15 text-orange-600'
+                    : isDark ? 'text-[#9494a8] hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                EN
+              </button>
+              <button
+                onClick={() => language !== 'vi' ? toggleLanguage() : undefined}
+                className={`px-2 py-1 rounded-md text-xs font-bold transition-all ${
+                  language === 'vi'
+                    ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-orange-500/15 text-orange-600'
+                    : isDark ? 'text-[#9494a8] hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                VI
+              </button>
+            </div>
             <button
               onClick={toggleTheme}
               className={`p-2 rounded-lg transition-all cursor-pointer ${isDark ? 'text-[#9494a8] hover:text-white hover:bg-white/5' : 'text-slate-500 hover:text-slate-900 hover:bg-black/5'}`}
@@ -188,18 +220,19 @@ export default function Navbar() {
               exit={{ height: 0, opacity: 0 }}
               className={`md:hidden overflow-hidden border-t ${isDark ? 'border-white/[0.04] bg-[#0a0a0f]/95' : 'border-black/[0.06] bg-white/95'}`}
             >
-              <div className="py-3 space-y-1">
+                <div className="py-3 space-y-1">
                 {navLinks.map(link => (
                   <Link
                     key={link.to}
                     to={link.to}
                     onClick={() => setMobileOpen(false)}
-                    className={`block px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                       isActive(link.to)
                         ? `${linkActive} border-l-2 ${isDark ? 'border-amber-500' : 'border-orange-500'}`
                         : `${linkBase} ${linkHover}`
                     }`}
                   >
+                    <NavIcon name={link.icon || ''} />
                     {link.label}
                   </Link>
                 ))}

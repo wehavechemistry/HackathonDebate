@@ -1,12 +1,13 @@
 import { motion } from 'framer-motion';
 import { Navigate } from 'react-router-dom';
-import { Sun, Moon, Globe } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import CoachCrab from '../components/CoachCrab';
 
 export default function Settings() {
   const { currentUser, language, theme, toggleTheme, toggleLanguage } = useStore();
+  const isDark = theme === 'dark';
 
   if (!currentUser) return <Navigate to="/login" />;
 
@@ -37,13 +38,28 @@ export default function Settings() {
               <h3 className="font-medium text-white">{t('settings.language', language)}</h3>
               <p className="text-sm text-slate-400">{language === 'en' ? 'English' : 'Tiếng Việt'}</p>
             </div>
-            <button
-              onClick={toggleLanguage}
-              className="p-3 rounded-xl bg-slate-700/50 hover:bg-slate-600/50 text-white transition-all flex items-center gap-2"
-            >
-              <Globe size={20} />
-              <span className="text-sm font-medium">{language.toUpperCase()}</span>
-            </button>
+            <div className={`flex items-center rounded-xl p-1 ${isDark ? 'bg-white/5' : 'bg-black/5'}`}>
+              <button
+                onClick={() => language !== 'en' ? toggleLanguage() : undefined}
+                className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                  language === 'en'
+                    ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-orange-500/15 text-orange-600'
+                    : isDark ? 'text-[#9494a8] hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                EN
+              </button>
+              <button
+                onClick={() => language !== 'vi' ? toggleLanguage() : undefined}
+                className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                  language === 'vi'
+                    ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-orange-500/15 text-orange-600'
+                    : isDark ? 'text-[#9494a8] hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                VI
+              </button>
+            </div>
           </div>
         </div>
       </motion.div>

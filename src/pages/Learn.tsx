@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ChevronLeft, Check, Pin, Lock, ArrowRight, Sparkles } from 'lucide-react';
@@ -6,6 +6,8 @@ import { useStore } from '../store';
 import { t } from '../i18n';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import CoachCrab from '../components/CoachCrab';
+import LessonPlayer from '../components/LessonPlayer';
+import type { LessonStep, Lesson } from '../types';
 
 function LessonNode({
   index,
@@ -118,19 +120,38 @@ export default function Learn() {
   if (lessonId) {
     const lesson = lessons.find(l => l.id === lessonId);
     if (!lesson) return <Navigate to="/learn" />;
-    const content = language === 'vi' ? lesson.content_vi : lesson.content_en;
     const title = language === 'vi' ? lesson.title_vi : lesson.title_en;
-    const isCompleted = currentUser?.completedLessons.includes(lesson.id);
+    const isInteractive = lesson.type === 'interactive';
+    const isCompleted = currentUser?.completedLessons.includes(lessonId);
     const unlocked = isLessonUnlocked(lesson.id);
     const nextLesson = getNextLesson(lesson.id);
 
-    const handleComplete = () => {
+    const handleComplete = (xpReward = 0) => {
       if (!currentUser) return;
-      completeLesson(lesson.id);
-      addActivity({ type: 'lesson', title, detail: lesson.level });
+      completeLesson(lessonId, xpReward);
+      addActivity({ 
+        type: 'lesson', 
+        title, 
+        detail: lesson.level 
+      });
     };
 
     if (!unlocked && !isCompleted) return <Navigate to="/learn" />;
+
+    if (isInteractive) {
+      return (
+        <div className="h-[calc(100vh-4.5rem)]">
+          <LessonPlayer
+            steps={lesson.steps || []}
+            xpReward={lesson.xpReward || 50}
+            onComplete={handleComplete}
+            language={language}
+            coachId={lesson.coachId}
+            coachName={lesson.coachName}
+          />
+        </div>
+      );
+    }
 
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
@@ -142,80 +163,62 @@ export default function Learn() {
           {t('learn.back', language)}
         </Link>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="flex flex-wrap items-center gap-2 mb-5">
-            <span
-              className={`px-3 py-1 text-xs font-medium rounded-full border ${
-                lesson.level === 'beginner'
-                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                  : lesson.level === 'intermediate'
-                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                    : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-              }`}
-            >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-white">{title}</h2>
+            {isCompleted && <Check size={18} className="text-emerald-400" />}
+          </div>
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <span className={`px-3 py-1 text-xs font-medium rounded-full border ${
+              lesson.level === 'beginner'
+                ? 'bg-green-500/10 border-green-500/20 text-green-400'
+                : lesson.level === 'intermediate'
+                  ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
+                  : 'bg-red-500/10 border-red-500/20 text-red-400'
+            }`}>
               {t(`learn.${lesson.level}`, language)}
             </span>
-            {lesson.pinned && (
-              <span className="flex items-center gap-1 text-xs text-orange-400 bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20">
-                <Pin size={12} />
-                {language === 'vi' ? 'Được ghim' : 'Pinned'}
-              </span>
-            )}
-            {isCompleted && (
-              <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                <Check size={14} />
-                {t('learn.completed', language)}
-              </span>
-            )}
+            {lesson.pinned && <Pin size={12} className="text-orange-400" />}
           </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/[0.04] to-amber-500/[0.02] rounded-2xl pointer-events-none" />
-            <div className="relative bg-slate-900/60 backdrop-blur-xl border border-white/[0.08] rounded-2xl p-6 sm:p-8 shadow-2xl shadow-black/20">
-              <MarkdownRenderer content={content} />
-            </div>
+          <div className="p-6 rounded-xl bg-slate-900/50 border border-slate-700/50">
+            <MarkdownRenderer content={language === 'vi' ? lesson.content_vi : lesson.content_en} className="prose prose-slate dark:prose-invert max-w-none text-sm leading-relaxed" />
           </div>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            {currentUser && !isCompleted && (
-              <button
-                onClick={handleComplete}
-                className="px-8 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-medium rounded-xl transition-all shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 active:scale-[0.98]"
-              >
-                {t('learn.mark_complete', language)}
-              </button>
-            )}
-            {currentUser && isCompleted && nextLesson && (
-              <Link
-                to={`/learn/${nextLesson.id}`}
-                className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-medium rounded-xl transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 active:scale-[0.98]"
-              >
-                {t('learn.next_lesson', language)} <ArrowRight size={18} />
-              </Link>
-            )}
-            {currentUser && isCompleted && !nextLesson && (
-              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm max-w-md">
-                {language === 'vi'
-                  ? '🎉 Bạn đã hoàn thành tất cả bài học ở cấp độ này!'
-                  : '🎉 You completed all lessons in this level!'}
-              </div>
-            )}
-          </div>
+          {nextLesson && (
+            <Link
+              to={`/learn/${nextLesson.id}`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-all"
+            >
+              {t('learn.next_lesson', language)} <ArrowRight size={16} />
+            </Link>
+          )}
         </motion.div>
       </div>
     );
   }
 
-  // ─── Roadmap view ───
+// ─── Roadmap view ───
 
   const levels: Array<'beginner' | 'intermediate' | 'advanced'> = [
     'beginner',
     'intermediate',
     'advanced',
   ];
-  const filteredLessons = lessons
+  
+  const allLessons = lessons.map(l => ({ 
+    id: l.id, 
+    level: l.level, 
+    order: l.order || 0, 
+    title_en: l.title_en, 
+    title_vi: l.title_vi, 
+    pinned: l.pinned || false,
+    content_en: l.content_en,
+    content_vi: l.content_vi,
+    type: l.type || 'static',
+  }));
+  
+  const filteredLessons = allLessons
     .filter(l => l.level === activeLevel)
-    .sort((a, b) => a.order - b.order);
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
 
   const currentLessonId = filteredLessons.find(
     l => isLessonUnlocked(l.id) && !currentUser?.completedLessons.includes(l.id)

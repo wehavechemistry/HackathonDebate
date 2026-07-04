@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BookOpen, Swords, Target, Lightbulb } from 'lucide-react';
+import { BookOpen, Swords, Target, Lightbulb, CalendarDays } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import CoachCrab from '../components/CoachCrab';
@@ -12,10 +12,15 @@ const fadeIn = {
 };
 
 export default function Home() {
-  const { language, announcements } = useStore();
+  const { language, announcements, motions } = useStore();
   useEffect(() => {
     fetch('/restart_server', { method: 'POST' });
   }, []);
+  
+  const randomMotion = motions.length > 0 
+    ? motions[Math.floor(Math.random() * motions.length)]
+    : null;
+  
   const features = [
     { icon: BookOpen, title: t('home.features.learn', language), desc: t('home.features.learn.desc', language), to: '/learn', color: 'from-blue-500 to-cyan-500' },
     { icon: Swords, title: t('home.features.battle', language), desc: t('home.features.battle.desc', language), to: '/battle', color: 'from-red-500 to-orange-500' },
@@ -73,10 +78,42 @@ export default function Home() {
               {t('home.hero.cta2', language)}
             </Link>
           </motion.div>
-        </div>
-      </section>
+         </div>
+       </section>
 
-      {/* Features */}
+       {/* Daily Motion Card */}
+       {randomMotion && (
+         <section className="max-w-5xl mx-auto px-6 pb-8">
+           <motion.div
+             initial={{ opacity: 0, y: 20 }}
+             animate={{ opacity: 1, y: 0 }}
+             transition={{ delay: 0.1, duration: 0.5 }}
+             className="p-6 bg-slate-900/40 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/20"
+           >
+             <div className="flex items-center gap-3 mb-3">
+               <CalendarDays size={20} className="text-orange-400" />
+               <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wider">{language === 'vi' ? 'Đề bài hôm nay' : 'Daily Motion'}</h3>
+             </div>
+             <p className="text-lg text-white mb-4">{language === 'vi' ? randomMotion.motion_vi : randomMotion.motion_en}</p>
+             <div className="flex gap-2">
+               <Link
+                 to="/battle"
+                 className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-all"
+               >
+                 {language === 'vi' ? 'Tranh luận ngay' : 'Debate Now'}
+               </Link>
+               <Link
+                 to="/prep"
+                 className="px-4 py-2 border border-white/[0.08] hover:border-orange-500 text-slate-300 hover:text-orange-400 text-sm font-medium rounded-lg transition-all"
+               >
+                 {language === 'vi' ? 'Chuẩn bị' : 'Prepare'}
+               </Link>
+             </div>
+           </motion.div>
+         </section>
+       )}
+
+       {/* Features */}
       <section className="max-w-5xl mx-auto px-6 pb-20">
         <div className="grid sm:grid-cols-2 gap-6">
           {features.map((f, i) => (

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Shuffle, Send, ArrowRight, Award, Flame, Zap } from 'lucide-react';
+import { Shuffle, Send, ArrowRight, Award, Flame, Zap, MessageSquare, Mic, FileText, Sparkles, ClipboardList } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import {
@@ -36,8 +36,10 @@ export default function Training() {
   const [feedback, setFeedback] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState<'generate' | 'input' | 'feedback'>('generate');
+  const [useCustomMotion, setUseCustomMotion] = useState(false);
+  const [customMotion, setCustomMotion] = useState('');
 
-  const categories = ['random', 'education', 'technology', 'environment', 'economics', 'politics', 'society', 'media', 'culture'];
+  const categories = ['random', ...Array.from(new Set(motions.map(m => m.category))).sort()];
   const debateLang = language;
 
   const motionOnlyModes: Mode[] = ['speech', 'framing'];
@@ -51,12 +53,15 @@ export default function Training() {
     return pick;
   };
 
+  const getActiveMotionText = () => {
+    if (useCustomMotion && customMotion) return customMotion;
+    return selectedMotion ? (debateLang === 'vi' ? selectedMotion.motion_vi : selectedMotion.motion_en) : '';
+  };
+
   const generateArgument = async () => {
-    const motion = randomizeMotion();
-    if (!motion) return;
     setIsLoading(true);
     setStep('input');
-    const motionText = debateLang === 'vi' ? motion.motion_vi : motion.motion_en;
+    const motionText = getActiveMotionText();
     const prompt = debateLang === 'vi'
       ? 'Tao mot luan diem NGAN GON (50-100 tu) ung ho de bai sau. Chi viet luan diem, khong them gi khac.'
       : 'Generate a BRIEF argument (50-100 words) supporting the following motion. Only the argument, nothing else.';
@@ -65,15 +70,18 @@ export default function Training() {
       { role: 'user', content: motionText },
     ]);
     setGeneratedArg(result);
+    if (!useCustomMotion) {
+      const m = randomizeMotion();
+      if (m) setSelectedMotion(m);
+    }
     setIsLoading(false);
   };
 
-  const generatePOIArgument = async () => {
-    const motion = randomizeMotion();
-    if (!motion) return;
+const generatePOIArgument = async () => {
+    const motionText = getActiveMotionText();
+    if (!motionText) return;
     setIsLoading(true);
     setStep('input');
-    const motionText = debateLang === 'vi' ? motion.motion_vi : motion.motion_en;
     const prompt = debateLang === 'vi'
       ? 'Tao mot luan diem NGAN GON (30-60 tu) ve de bai nay. Chi viet luan diem.'
       : 'Generate a SHORT argument (30-60 words) about this motion. Only the argument.';
@@ -82,6 +90,10 @@ export default function Training() {
       { role: 'user', content: motionText },
     ]);
     setGeneratedArg(result);
+    if (!useCustomMotion) {
+      const m = randomizeMotion();
+      if (m) setSelectedMotion(m);
+    }
     setIsLoading(false);
   };
 
@@ -98,13 +110,13 @@ export default function Training() {
     setIsLoading(false);
     incrementTrainingStat('rebuttals');
     await addTrainingScore('rebuttals', 25);
-    addActivity({ type: 'training', title: language === 'vi' ? 'Luy\u1ec7n ph\u1ea3n bi\u1ec7n' : 'Rebuttal Practice' });
+    addActivity({ type: 'training', title: language === 'vi' ? 'Luyện phản biện' : 'Rebuttal Practice' });
   };
 
   const submitSpeech = async () => {
     if (!userInput.trim()) return;
     setIsLoading(true);
-    const motionText = selectedMotion ? (debateLang === 'vi' ? selectedMotion.motion_vi : selectedMotion.motion_en) : '';
+    const motionText = getActiveMotionText();
     const sideLabel = side === 'for' ? t('battle.for', language) : t('battle.against', language);
     const prompt = buildSpeechPracticePrompt(debateLang);
     const result = await callOpenRouterWithRetry([
@@ -116,10 +128,10 @@ export default function Training() {
     setIsLoading(false);
     incrementTrainingStat('speeches');
     await addTrainingScore('speeches', 30);
-    addActivity({ type: 'training', title: language === 'vi' ? 'Luy\u1ec7n di\u1ec5n thuy\u1ebft' : 'Speech Practice' });
+    addActivity({ type: 'training', title: language === 'vi' ? 'Luyện diễn thuyết' : 'Speech Practice' });
   };
 
-  const submitPOI = async () => {
+const submitPOI = async () => {
     if (!userInput.trim()) return;
     setIsLoading(true);
     const prompt = buildPOIPracticePrompt(debateLang);
@@ -132,7 +144,7 @@ export default function Training() {
     setIsLoading(false);
     incrementTrainingStat('pois');
     await addTrainingScore('pois', 20);
-    addActivity({ type: 'training', title: language === 'vi' ? 'Luy\u1ec7n POI' : 'POI Practice' });
+    addActivity({ type: 'training', title: language === 'vi' ? 'Luyện POI' : 'POI Practice' });
   };
 
   const submitFraming = async () => {
@@ -158,14 +170,16 @@ export default function Training() {
     setGeneratedArg('');
     setUserInput('');
     setFeedback('');
+    setUseCustomMotion(false);
+    setCustomMotion('');
   };
 
   if (mode === 'menu') {
-    const modes: { key: Mode; title: string; desc: string; color: string }[] = [
-      { key: 'rebuttal', title: t('training.rebuttal', language), desc: t('training.rebuttal.desc', language), color: 'from-red-500 to-orange-500' },
-      { key: 'speech', title: t('training.speech', language), desc: t('training.speech.desc', language), color: 'from-blue-500 to-cyan-500' },
-      { key: 'poi', title: t('training.poi', language), desc: t('training.poi.desc', language), color: 'from-green-500 to-emerald-500' },
-      { key: 'framing', title: t('training.framing', language), desc: t('training.framing.desc', language), color: 'from-pink-500 to-rose-600' },
+    const modes: { key: Mode; title: string; desc: string; color: string; icon: React.ElementType; xp: number; time: string; difficulty: 'Easy' | 'Medium' | 'Hard' }[] = [
+      { key: 'rebuttal', title: t('training.rebuttal', language), desc: t('training.rebuttal.desc', language), color: 'from-red-500 to-orange-500', icon: MessageSquare, xp: 25, time: '2-3 min', difficulty: 'Medium' },
+      { key: 'speech', title: t('training.speech', language), desc: t('training.speech.desc', language), color: 'from-blue-500 to-cyan-500', icon: Mic, xp: 30, time: '3-5 min', difficulty: 'Medium' },
+      { key: 'poi', title: t('training.poi', language), desc: t('training.poi.desc', language), color: 'from-green-500 to-emerald-500', icon: ClipboardList, xp: 20, time: '1-2 min', difficulty: 'Easy' },
+      { key: 'framing', title: t('training.framing', language), desc: t('training.framing.desc', language), color: 'from-pink-500 to-rose-600', icon: Sparkles, xp: 25, time: '2-4 min', difficulty: 'Hard' },
     ];
 
     const xpForNext = tier === 'bronze' ? 100 : tier === 'silver' ? 500 : tier === 'gold' ? 2000 : 5000;
@@ -217,21 +231,37 @@ export default function Training() {
               key={m.key}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              onClick={() => { setMode(m.key); reset(); }}
-              className="text-left p-6 rounded-2xl border border-white/[0.06] bg-slate-900/50 hover:bg-slate-900/80 transition-all hover:border-white/[0.1] group glass-card"
-            >
-              <div className={`inline-flex p-3 rounded-xl bg-gradient-to-r ${m.color} mb-4 shadow-lg shadow-black/20`}>
-                <ArrowRight size={20} className="text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-1 group-hover:text-orange-400 transition-colors">{m.title}</h3>
-              <p className="text-sm text-slate-400">{m.desc}</p>
-            </motion.button>
-          ))}
-        </div>
-      </div>
-    );
-  }
+transition={{ delay: i * 0.05 }}
+               onClick={() => { setMode(m.key); reset(); }}
+               className="text-left p-6 rounded-2xl border border-white/[0.06] bg-slate-900/50 hover:bg-slate-900/80 transition-all hover:border-white/[0.1] hover:translate-y-[-4px] group glass-card"
+             >
+               <div className={`inline-flex p-3 rounded-xl bg-gradient-to-r ${m.color} mb-4 shadow-lg shadow-black/20`}>
+                 <m.icon size={20} className="text-white" />
+               </div>
+               <h3 className="text-lg font-semibold text-white mb-1 group-hover:text-orange-400 transition-colors">{m.title}</h3>
+               <p className="text-sm text-slate-400 mb-3">{m.desc}</p>
+               <div className="flex items-center justify-between text-xs">
+                 <span className="text-orange-400 font-medium flex items-center gap-1">
+                   <Zap size={12} /> +{m.xp} XP
+                 </span>
+                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                   m.difficulty === 'Easy' ? 'bg-green-500/20 text-green-400' :
+                   m.difficulty === 'Medium' ? 'bg-amber-500/20 text-amber-400' :
+                   'bg-rose-500/20 text-rose-400'
+                 }`}>
+                   {language === 'vi' ? (
+                     m.difficulty === 'Easy' ? 'Dễ' :
+                     m.difficulty === 'Medium' ? 'TB' : 'Khó'
+                   ) : m.difficulty}
+                 </span>
+               </div>
+               <p className="text-[10px] text-slate-500 mt-1">{m.time}</p>
+             </motion.button>
+           ))}
+         </div>
+       </div>
+     );
+   }
 
   const modeLabel = mode === 'rebuttal' ? t('training.rebuttal', language)
     : mode === 'speech' ? t('training.speech', language)
@@ -291,6 +321,30 @@ export default function Training() {
             </div>
           </div>
 
+          {/* Custom Motion Toggle */}
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-2">{t('battle.motion_source', language) || 'Motion Source'}</label>
+            <div className="flex gap-1.5">
+              <button onClick={() => { setUseCustomMotion(false); setCustomMotion(''); }}
+                className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${!useCustomMotion ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                {language === 'vi' ? 'Ngẫu nhiên' : 'Random'}
+              </button>
+              <button onClick={() => setUseCustomMotion(true)}
+                className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${useCustomMotion ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                {language === 'vi' ? 'Tự nhập' : 'Custom'}
+              </button>
+            </div>
+            {useCustomMotion && (
+              <textarea
+                value={customMotion}
+                onChange={e => setCustomMotion(e.target.value)}
+                placeholder={language === 'vi' ? 'Nhập đề bài...' : 'Enter your motion...'}
+                className="w-full px-3 py-2 mt-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                rows={2}
+              />
+            )}
+          </div>
+
           {(mode === 'speech' || mode === 'framing') && (
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-2">{t('battle.side', language)}</label>
@@ -311,11 +365,11 @@ export default function Training() {
               if (mode === 'poi') generatePOIArgument();
               else if (motionOnlyModes.includes(mode)) {
                 const m = randomizeMotion();
-                if (m) { setStep('input'); }
+                if (m || useCustomMotion) { setStep('input'); }
               }
               else generateArgument();
             }}
-            disabled={!aiConfigured}
+            disabled={!aiConfigured || (useCustomMotion && !customMotion)}
             className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-xl transition-all disabled:opacity-50"
           >
             <Shuffle size={16} className="inline mr-2" />
@@ -326,10 +380,20 @@ export default function Training() {
 
       {step === 'input' && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-          {selectedMotion && (
+          {selectedMotion && !useCustomMotion && (
             <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-700/50">
               <p className="text-xs text-slate-400 mb-1">{t('battle.motion', language)}</p>
               <p className="text-white font-medium">{debateLang === 'vi' ? selectedMotion.motion_vi : selectedMotion.motion_en}</p>
+              {(mode === 'speech' || mode === 'framing') && (
+                <p className="text-xs text-orange-400 mt-2">{t('battle.side', language)}: {side === 'for' ? t('battle.for', language) : t('battle.against', language)}</p>
+              )}
+            </div>
+          )}
+
+          {useCustomMotion && (
+            <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-700/50">
+              <p className="text-xs text-slate-400 mb-1">{t('battle.motion', language)}</p>
+              <p className="text-white font-medium">{customMotion}</p>
               {(mode === 'speech' || mode === 'framing') && (
                 <p className="text-xs text-orange-400 mt-2">{t('battle.side', language)}: {side === 'for' ? t('battle.for', language) : t('battle.against', language)}</p>
               )}
