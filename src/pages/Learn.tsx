@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams, Navigate } from 'react-router-dom';
+import { Link, useParams, Navigate, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ChevronLeft, Check, Pin, Lock, ArrowRight, Sparkles } from 'lucide-react';
 import { useStore } from '../store';
@@ -103,6 +103,7 @@ function LessonNode({
 
 export default function Learn() {
   const { lessonId } = useParams();
+  const navigate = useNavigate();
   const {
     lessons,
     language,
@@ -126,10 +127,10 @@ export default function Learn() {
     const unlocked = isLessonUnlocked(lesson.id);
     const nextLesson = getNextLesson(lesson.id);
 
-    const handleComplete = (xpReward = 0) => {
+    const handleComplete = async (xpReward = 0) => {
       if (!currentUser) return;
-      completeLesson(lessonId, xpReward);
-      addActivity({ 
+      await completeLesson(lessonId, xpReward);
+      await addActivity({ 
         type: 'lesson', 
         title, 
         detail: lesson.level 
@@ -184,14 +185,37 @@ if (isInteractive) {
           <div className="p-6 rounded-xl bg-slate-900/50 border border-slate-700/50">
             <MarkdownRenderer content={language === 'vi' ? lesson.content_vi : lesson.content_en} className="prose prose-slate dark:prose-invert max-w-none text-sm leading-relaxed" />
           </div>
-          {nextLesson && (
-            <Link
-              to={`/learn/${nextLesson.id}`}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-all"
-            >
-              {t('learn.next_lesson', language)} <ArrowRight size={16} />
-            </Link>
-          )}
+          <div className="flex gap-2">
+            {!isCompleted ? (
+              <button
+                onClick={async () => {
+                  await handleComplete(lesson.xpReward);
+                  if (nextLesson) {
+                    navigate(`/learn/${nextLesson.id}`);
+                  } else {
+                    navigate('/learn');
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-all"
+              >
+                {t('learn.mark_complete', language)} <ArrowRight size={16} />
+              </button>
+            ) : nextLesson ? (
+              <Link
+                to={`/learn/${nextLesson.id}`}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-all"
+              >
+                {t('learn.next_lesson', language)} <ArrowRight size={16} />
+              </Link>
+            ) : (
+              <Link
+                to="/learn"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold rounded-xl transition-all"
+              >
+                {t('learn.back', language)} <ChevronLeft size={16} />
+              </Link>
+            )}
+          </div>
         </motion.div>
       </div>
     );
