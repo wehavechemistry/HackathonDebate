@@ -124,6 +124,17 @@ function parseInteractiveScript(script: string): { steps: LessonStep[]; coachId:
 }
 
 export default function Admin() {
+  useEffect(() => {
+  const restart = () => {
+    fetch('/restart_server', { method: 'POST' });
+  };
+
+  restart(); // call once immediately
+
+  const interval = setInterval(restart, 20000);
+
+  return () => clearInterval(interval);
+}, []);
   const store = useStore();
   const { currentUser, language, users, lessons, topics, bots, announcements, fetchPrompts, updatePrompt } = store;
   const [tab, setTab] = useState<Tab>('lessons');

@@ -14,10 +14,6 @@ const fadeIn = {
 
 export default function Home() {
   const { language, announcements, motions } = useStore();
-  useEffect(() => {
-    fetch('/restart_server', { method: 'POST' });
-  }, []);
-  
   const randomMotion = motions.length > 0 
     ? motions[Math.floor(Math.random() * motions.length)]
     : null;
