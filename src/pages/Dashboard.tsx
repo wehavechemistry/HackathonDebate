@@ -1,21 +1,20 @@
 import { Link, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BookOpen, Swords, Target, Lightbulb, Trash2, Clock, FileText } from 'lucide-react';
+import { Trash2, Clock, FileText } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import CoachCrab from '../components/CoachCrab';
+import { dashboardQuickLinks } from '../data/content';
 
 export default function Dashboard() {
   const { currentUser, language, clearActivity, deleteNote, lessons } = useStore();
 
   if (!currentUser) return <Navigate to="/login" />;
 
-  const quickLinks = [
-    { to: '/learn', icon: BookOpen, label: t('nav.learn', language), color: 'bg-blue-500/20 text-blue-400' },
-    { to: '/battle', icon: Swords, label: t('nav.battle', language), color: 'bg-red-500/20 text-red-400' },
-    { to: '/training', icon: Target, label: t('nav.training', language), color: 'bg-green-500/20 text-green-400' },
-    { to: '/prep', icon: Lightbulb, label: t('nav.prepare', language), color: 'bg-purple-500/20 text-purple-400' },
-  ];
+  const quickLinks = dashboardQuickLinks.map(link => ({
+    ...link,
+    label: t(link.labelKey, language),
+  }));
 
   // Find next incomplete lesson
   const nextLesson = lessons.find(l => !currentUser.completedLessons.includes(l.id));

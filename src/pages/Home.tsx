@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BookOpen, Swords, Target, Lightbulb, CalendarDays } from 'lucide-react';
+import { CalendarDays } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import CoachCrab from '../components/CoachCrab';
 import { useEffect } from 'react';
+import { homeFeatureCards } from '../data/content';
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
@@ -21,12 +22,11 @@ export default function Home() {
     ? motions[Math.floor(Math.random() * motions.length)]
     : null;
   
-  const features = [
-    { icon: BookOpen, title: t('home.features.learn', language), desc: t('home.features.learn.desc', language), to: '/learn', color: 'from-blue-500 to-cyan-500' },
-    { icon: Swords, title: t('home.features.battle', language), desc: t('home.features.battle.desc', language), to: '/battle', color: 'from-red-500 to-orange-500' },
-    { icon: Target, title: t('home.features.training', language), desc: t('home.features.training.desc', language), to: '/training', color: 'from-green-500 to-emerald-500' },
-    { icon: Lightbulb, title: t('home.features.prep', language), desc: t('home.features.prep.desc', language), to: '/prep', color: 'from-purple-500 to-pink-500' },
-  ];
+  const features = homeFeatureCards.map(card => ({
+    ...card,
+    title: t(card.titleKey, language),
+    desc: t(card.descKey, language),
+  }));
 
   return (
     <div className="min-h-screen max-w-7xl mx-auto px-6 pt-16">

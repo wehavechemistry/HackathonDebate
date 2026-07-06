@@ -5,23 +5,17 @@ import { useStore } from '../store';
 import { t } from '../i18n';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import CoachCrab from '../components/CoachCrab';
+import { topicCategories } from '../data/content';
 
 export default function Topics() {
   const { language, topics } = useStore();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeTopic, setActiveTopic] = useState<string | null>(null);
 
-  const categories = [
-    { key: 'education', label: t('topics.education', language), color: 'from-blue-500 to-cyan-500' },
-    { key: 'technology', label: t('topics.technology', language), color: 'from-purple-500 to-violet-500' },
-    { key: 'environment', label: t('topics.environment', language), color: 'from-green-500 to-emerald-500' },
-    { key: 'economics', label: t('topics.economics', language), color: 'from-yellow-500 to-amber-500' },
-    { key: 'politics', label: t('topics.politics', language), color: 'from-red-500 to-rose-500' },
-    { key: 'society', label: t('topics.society', language), color: 'from-teal-500 to-cyan-500' },
-    { key: 'media', label: t('topics.media', language), color: 'from-indigo-500 to-blue-500' },
-    { key: 'culture', label: t('topics.culture', language), color: 'from-pink-500 to-rose-500' },
-    { key: 'misc', label: t('topics.misc', language), color: 'from-slate-500 to-gray-500' },
-  ];
+  const categories = topicCategories.map(category => ({
+    ...category,
+    label: t(category.labelKey, language),
+  }));
 
   const getCategoryImage = (catKey: string) => `/topic-thumbnails/${catKey}.png`;
 

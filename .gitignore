@@ -2,3 +2,7 @@ node_modules
 dist
 .env
 .vercel
+.kilo/
+tmp_inspect.mjs
+tmp_read.mjs
+tmp.cmd

@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CoachCrab from './CoachCrab';
 import MarkdownRenderer from './MarkdownRenderer';
-import { Check, Send, ArrowRight, Star } from 'lucide-react';
+import { Check, Send, ArrowRight, Star, MessageCircle } from 'lucide-react';
 import { getBotAvatar } from './BotAvatars';
 import { useToast } from './ToastContainer';
+import { useStore } from '../store';
 
 interface LessonStep {
   id: string;
@@ -24,20 +25,26 @@ interface LessonPlayerProps {
   language: 'en' | 'vi';
   coachId?: string;
   coachName?: string;
+  lessonId?: string;
 }
 
-export default function LessonPlayer({ steps, xpReward, onComplete, language, coachId = 'crab', coachName }: LessonPlayerProps) {
-  const toast = useToast();
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [chatHistory, setChatHistory] = useState<Array<{ role: 'coach' | 'user'; content: string }>>([]);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [showExplanation, setShowExplanation] = useState(false);
-  const [essayValue, setEssayValue] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-  const [finished, setFinished] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const step = steps[currentIndex];
-  const isLast = currentIndex === steps.length - 1;
+export default function LessonPlayer({ steps, xpReward, onComplete, language, coachId = 'crab', coachName, lessonId }: LessonPlayerProps) {
+   const toast = useToast();
+   const { submitFeedback } = useStore();
+   const [currentIndex, setCurrentIndex] = useState(0);
+   const [chatHistory, setChatHistory] = useState<Array<{ role: 'coach' | 'user'; content: string }>>([]);
+   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+   const [showExplanation, setShowExplanation] = useState(false);
+   const [essayValue, setEssayValue] = useState('');
+   const [submitted, setSubmitted] = useState(false);
+   const [finished, setFinished] = useState(false);
+   const [showFeedback, setShowFeedback] = useState(false);
+   const [feedbackText, setFeedbackText] = useState('');
+   const chatEndRef = useRef<HTMLDivElement>(null);
+   const step = steps[currentIndex];
+   const isLast = currentIndex === steps.length - 1;
+   
+   const lessonIdToUse = lessonId || null;
 
   useEffect(() => {
     if (step && chatHistory.length === 0) {
@@ -102,28 +109,77 @@ export default function LessonPlayer({ steps, xpReward, onComplete, language, co
     return getBotAvatar(coachId, 32);
   };
 
-  if (finished) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full space-y-4 text-center">
-        <div className="p-4 bg-orange-500/10 rounded-full">
-          {coachId === 'crab' ? <CoachCrab size={64} animate /> : getBotAvatar(coachId, 64)}
+  const handleFeedbackSubmit = async () => {
+      if (!feedbackText.trim()) return;
+      await submitFeedback(lessonIdToUse, feedbackText);
+      setFeedbackText('');
+      setShowFeedback(false);
+      toast.success(language === 'vi' ? 'Cảm ơn phản hồi của bạn!' : 'Thank you for your feedback!', 3000);
+    };
+
+    if (finished) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full space-y-4 text-center">
+          <div className="p-4 bg-orange-500/10 rounded-full">
+            {coachId === 'crab' ? <CoachCrab size={64} animate /> : getBotAvatar(coachId, 64)}
+          </div>
+          <h2 className="text-xl font-bold text-white">
+            {language === 'vi' ? 'Bai hoc hoan thanh!' : 'Lesson Complete!'}
+          </h2>
+          <div className="flex items-center gap-2 text-orange-400">
+            <Star size={20} className="fill-orange-400" />
+            <span className="font-semibold">+{xpReward} XP</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onComplete(xpReward)}
+              className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-all"
+            >
+              {language === 'vi' ? 'Quay lai' : 'Back to Lessons'}
+            </button>
+            <button
+              onClick={() => setShowFeedback(true)}
+              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all flex items-center gap-2"
+            >
+              <MessageCircle size={16} />
+              {language === 'vi' ? 'Phản hồi' : 'Feedback'}
+            </button>
+          </div>
+          
+          {showFeedback && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-slate-800 rounded-xl p-5 w-full max-w-md">
+                <h3 className="text-lg font-semibold text-white mb-3">
+                  {language === 'vi' ? 'Gửi phản hồi' : 'Send Feedback'}
+                </h3>
+                <textarea
+                  value={feedbackText}
+                  onChange={e => setFeedbackText(e.target.value)}
+                  placeholder={language === 'vi' ? 'Nhập phản hồi của bạn...' : 'Enter your feedback...'}
+                  className="w-full p-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white mb-4"
+                  rows={4}
+                />
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => setShowFeedback(false)}
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg"
+                  >
+                    {language === 'vi' ? 'Huy' : 'Cancel'}
+                  </button>
+                  <button
+                    onClick={handleFeedbackSubmit}
+                    disabled={!feedbackText.trim()}
+                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50"
+                  >
+                    {language === 'vi' ? 'Gui' : 'Send'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-        <h2 className="text-xl font-bold text-white">
-          {language === 'vi' ? 'Bai hoc hoan thanh!' : 'Lesson Complete!'}
-        </h2>
-        <div className="flex items-center gap-2 text-orange-400">
-          <Star size={20} className="fill-orange-400" />
-          <span className="font-semibold">+{xpReward} XP</span>
-        </div>
-        <button
-          onClick={() => onComplete(xpReward)}
-          className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-all"
-        >
-          {language === 'vi' ? 'Quay lai' : 'Back to Lessons'}
-        </button>
-      </div>
-    );
-  }
+      );
+    }
 
   if (!step) return null;
 

@@ -90,9 +90,13 @@ interface AppState {
      reorderTopics: (ids: string[]) => Promise<boolean>;
      deleteUser: (userId: string) => Promise<boolean>;
      refreshContent: () => Promise<void>;
-     fetchPrompts: () => Promise<Record<string, { key: string; content_en: string; content_vi: string }>>;
-     updatePrompt: (key: string, content_en: string, content_vi: string) => Promise<boolean>;
-   }
+fetchPrompts: () => Promise<Record<string, { key: string; content_en: string; content_vi: string }>>;
+      updatePrompt: (key: string, content_en: string, content_vi: string) => Promise<boolean>;
+      submitFeedback: (lessonId: string | null, content: string) => Promise<boolean>;
+      fetchFeedback: () => Promise<any[]>;
+      updateFeedbackStatus: (id: string, status: string) => Promise<boolean>;
+      deleteFeedback: (id: string) => Promise<boolean>;
+    }
 
 const STORAGE_KEY = 'debatecrab_config';
 
@@ -352,55 +356,55 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  addInteractiveLesson: async (script) => {
-    try {
-      const lesson: Lesson = {
-        id: script.id || 'script_' + Date.now(),
-        type: 'interactive',
-        level: script.level || 'beginner',
-        title_en: script.title,
-        title_vi: script.title,
-        content_en: '',
-        content_vi: '',
-        order: 0,
-        pinned: false,
-        description: script.description,
-        xpReward: script.xpReward,
-        coachId: script.coachId,
-        coachName: script.coachName,
-        steps: script.steps,
-      };
-      const res = await fetch('/api/admin/lessons', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script }),
-      });
-      if (res.ok) {
-        set({ lessons: [...get().lessons, lesson] });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  },
+addInteractiveLesson: async (script) => {
+     try {
+       const lesson: Lesson = {
+         id: script.id || 'script_' + Date.now(),
+         type: 'interactive',
+         level: script.level || 'beginner',
+         title_en: script.title,
+         title_vi: script.title,
+         content_en: '',
+         content_vi: '',
+         order: 0,
+         pinned: false,
+         description: script.description,
+         xpReward: script.xpReward,
+         coachId: script.coachId,
+         coachName: script.coachName,
+         steps: script.steps,
+       };
+       const res = await fetch('/api/lessons', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ script, lesson: { order: get().lessons.length + 1 } }),
+       });
+       if (res.ok) {
+         set({ lessons: [...get().lessons, lesson] });
+       }
+     } catch (e) {
+       console.error(e);
+     }
+   },
 
-  updateInteractiveLesson: async (id, updates) => {
-    try {
-      const res = await fetch(`/api/admin/lessons/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates }),
-      });
-      if (res.ok) {
-        set({ lessons: get().lessons.map(s => (s as any).id === id ? { ...s, ...updates, type: 'interactive' as const } : s) });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  },
+   updateInteractiveLesson: async (id, updates) => {
+     try {
+       const res = await fetch(`/api/lessons/${id}`, {
+         method: 'PUT',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ script: updates }),
+       });
+       if (res.ok) {
+         set({ lessons: get().lessons.map((s: any) => s.id === id ? { ...s, ...updates, type: 'interactive' as const } : s) });
+       }
+     } catch (e) {
+       console.error(e);
+     }
+   },
 
   deleteInteractiveLesson: async (id) => {
     try {
-      const res = await fetch(`/api/admin/lessons/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/lessons/${id}`, { method: 'DELETE' });
       if (res.ok) {
         set({ lessons: get().lessons.filter((l: any) => l.id !== id) });
       }
@@ -1076,15 +1080,66 @@ unbanUser: async (userId) => {
     return false;
   },
 
-  getNextLesson: (lessonId: string) => {
-    const state = get();
-    const lesson = state.lessons.find(l => l.id === lessonId);
-    if (!lesson) return null;
-    
-    const nextLesson = state.lessons
-      .filter(l => l.level === lesson.level && l.order > lesson.order)
-      .sort((a, b) => a.order - b.order)[0];
-    
-    return nextLesson || null;
-  },
+getNextLesson: (lessonId: string) => {
+     const state = get();
+     const lesson = state.lessons.find(l => l.id === lessonId);
+     if (!lesson) return null;
+     
+     const nextLesson = state.lessons
+       .filter(l => l.level === lesson.level && l.order > lesson.order)
+       .sort((a, b) => a.order - b.order)[0];
+     
+     return nextLesson || null;
+   },
+
+   submitFeedback: async (lessonId: string | null, content: string) => {
+     try {
+       const res = await fetch('/api/feedback', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ lessonId, content }),
+       });
+       return res.ok;
+     } catch (e) {
+       console.error(e);
+       return false;
+     }
+   },
+
+   fetchFeedback: async () => {
+     try {
+       const res = await fetch('/api/admin/feedback');
+       if (res.ok) {
+         const data = await res.json();
+         return data;
+       }
+     } catch (e) {
+       console.error(e);
+     }
+     return [];
+   },
+
+   updateFeedbackStatus: async (id: string, status: string) => {
+     try {
+       const res = await fetch(`/api/admin/feedback/${id}`, {
+         method: 'PUT',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ status }),
+       });
+       return res.ok;
+     } catch (e) {
+       console.error(e);
+       return false;
+     }
+   },
+
+   deleteFeedback: async (id: string) => {
+     try {
+       const res = await fetch(`/api/admin/feedback/${id}`, { method: 'DELETE' });
+       return res.ok;
+     } catch (e) {
+       console.error(e);
+       return false;
+     }
+   },
 }));

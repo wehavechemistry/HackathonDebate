@@ -138,20 +138,21 @@ export default function Learn() {
 
     if (!unlocked && !isCompleted) return <Navigate to="/learn" />;
 
-    if (isInteractive) {
-      return (
-        <div className="h-[calc(100vh-4.5rem)]">
-          <LessonPlayer
-            steps={lesson.steps || []}
-            xpReward={lesson.xpReward || 50}
-            onComplete={handleComplete}
-            language={language}
-            coachId={lesson.coachId}
-            coachName={lesson.coachName}
-          />
-        </div>
-      );
-    }
+if (isInteractive) {
+       return (
+         <div className="h-[calc(100vh-4.5rem)]">
+           <LessonPlayer
+             steps={lesson.steps || []}
+             xpReward={lesson.xpReward || 50}
+             onComplete={handleComplete}
+             language={language}
+             coachId={lesson.coachId}
+             coachName={lesson.coachName}
+             lessonId={lesson.id}
+           />
+         </div>
+       );
+     }
 
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">

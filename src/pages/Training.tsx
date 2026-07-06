@@ -14,6 +14,7 @@ import {
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import CoachCrab from '../components/CoachCrab';
 import type { DebateMotion } from '../types';
+import { battleDifficultyLevels, battleSides, trainingModePresets } from '../data/content';
 
 type Mode = 'menu' | 'rebuttal' | 'speech' | 'poi' | 'framing';
 
@@ -175,12 +176,12 @@ const submitPOI = async () => {
   };
 
   if (mode === 'menu') {
-    const modes: { key: Mode; title: string; desc: string; color: string; icon: React.ElementType; xp: number; time: string; difficulty: 'Easy' | 'Medium' | 'Hard' }[] = [
-      { key: 'rebuttal', title: t('training.rebuttal', language), desc: t('training.rebuttal.desc', language), color: 'from-red-500 to-orange-500', icon: MessageSquare, xp: 25, time: '2-3 min', difficulty: 'Medium' },
-      { key: 'speech', title: t('training.speech', language), desc: t('training.speech.desc', language), color: 'from-blue-500 to-cyan-500', icon: Mic, xp: 30, time: '3-5 min', difficulty: 'Medium' },
-      { key: 'poi', title: t('training.poi', language), desc: t('training.poi.desc', language), color: 'from-green-500 to-emerald-500', icon: ClipboardList, xp: 20, time: '1-2 min', difficulty: 'Easy' },
-      { key: 'framing', title: t('training.framing', language), desc: t('training.framing.desc', language), color: 'from-pink-500 to-rose-600', icon: Sparkles, xp: 25, time: '2-4 min', difficulty: 'Hard' },
-    ];
+    const modes = trainingModePresets.map(mode => ({
+      ...mode,
+      title: t(mode.titleKey, language),
+      desc: t(mode.descKey, language),
+      icon: mode.icon,
+    }));
 
     const xpForNext = tier === 'bronze' ? 100 : tier === 'silver' ? 500 : tier === 'gold' ? 2000 : 5000;
     const xpProgress = Math.min(totalXp / xpForNext, 1);
@@ -302,7 +303,7 @@ transition={{ delay: i * 0.05 }}
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-2">{t('battle.difficulty', language)}</label>
               <div className="flex gap-2">
-                {(['easy', 'intermediate', 'hard'] as const).map(d => (
+                {battleDifficultyLevels.map(d => (
                   <button key={d} onClick={() => setDifficulty(d)}
                     className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${difficulty === d ? 'bg-orange-500 text-white' : 'bg-slate-800/50 text-slate-400'}`}>
                     {t(`battle.${d}`, language)}
@@ -349,7 +350,7 @@ transition={{ delay: i * 0.05 }}
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-2">{t('battle.side', language)}</label>
               <div className="flex gap-2">
-                {(['for', 'against'] as const).map(s => (
+                {battleSides.map(s => (
                   <button key={s} onClick={() => setSide(s)}
                     className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${side === s ? 'bg-orange-500 text-white' : 'bg-slate-800/50 text-slate-400'}`}>
                     {t(`battle.${s}`, language)}

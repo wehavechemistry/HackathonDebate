@@ -9,6 +9,7 @@ import { getBotAvatar, BotAvatar } from '../components/BotAvatars';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import CoachCrab from '../components/CoachCrab';
 import type { BotPersonality, DebateMotion, ChatMessage } from '../types';
+import { battleDifficultyLevels, battleSides, battleSpeakerOrders } from '../data/content';
 
 interface ScoreRow {
   criteria: string;
@@ -537,6 +538,10 @@ export default function Battle() {
       ]);
       setMessages([{ role: 'assistant', content: result, timestamp: new Date().toISOString() }]);
       setIsLoading(false);
+      setAiSpeeches(1);
+      if (voiceEnabled && !isCustomEngine && selectedBot?.voice_style) {
+        speakText(result, selectedBot.voice_style);
+      }
       setCurrentTurn('user');
       setTimeRemaining(speechTime * 60);
     } else {
@@ -545,18 +550,35 @@ export default function Battle() {
     }
   };
 
+  const speakText = (text: string, style: string) => {
+    if (typeof (window as any).responsiveVoice !== 'undefined') {
+      let voiceName = 'UK English Male';
+      if (style === 'woman') voiceName = 'UK English Female';
+      else if (style === 'boy') voiceName = 'UK English Male';
+      else if (style === 'girl') voiceName = 'UK English Female';
+      else if (style === 'man') voiceName = 'US English Male';
+      (window as any).responsiveVoice.speak(text, voiceName, { rate: 1 });
+    }
+  };
+
+  const speakTextDefault = (text: string) => {
+    if (typeof (window as any).responsiveVoice !== 'undefined') {
+      (window as any).responsiveVoice.speak(text, 'UK English Male', { rate: 1 });
+    }
+  };
+
   const submitSpeech = async (directContent?: string) => {
     const content = (directContent ?? inputText).trim();
     if (!content || !motion_) return;
     const userMsg: ChatMessage = { role: 'user', content, timestamp: new Date().toISOString() };
     const newMessages = [...messages, userMsg];
+    const newUserSpeeches = userSpeeches + 1;
+    setUserSpeeches(newUserSpeeches);
     setMessages(newMessages);
     setInputText('');
     setTimerRunning(false);
     setCurrentTurn('ai');
     setIsLoading(true);
-    setRound(prev => prev + 1);
-    setUserSpeeches(prev => prev + 1);
 
     const sysPrompt = buildDebateSystemPrompt(
       isCustomEngine ? null : selectedBot,
@@ -580,10 +602,25 @@ export default function Battle() {
 
     const aiMsg: ChatMessage = { role: 'assistant', content: result, timestamp: new Date().toISOString() };
     setMessages(prev => [...prev, aiMsg]);
+    const newAiSpeeches = aiSpeeches + 1;
+    setAiSpeeches(newAiSpeeches);
     setIsLoading(false);
+    
+    if (voiceEnabled && !isCustomEngine && selectedBot?.voice_style) {
+      speakText(result, selectedBot.voice_style);
+    }
+    
     setCurrentTurn('user');
     setTimeRemaining(speechTime * 60);
-    setAiSpeeches(prev => prev + 1);
+    
+    if (!endlessMode) {
+      setRound(() => {
+        const nextRound = Math.min(newUserSpeeches, rounds);
+        return nextRound;
+      });
+    } else {
+      setRound(prev => prev + 1);
+    }
   };
 
   const submitSpeechRef = useRef(submitSpeech);
@@ -773,7 +810,7 @@ export default function Battle() {
                       <div className="flex-1">
                         <label className="text-[10px] text-slate-500 mb-1 block">{t('battle.difficulty', language)}</label>
                         <div className="flex gap-1">
-                          {(['easy', 'intermediate', 'hard'] as const).map(d => (
+                          {battleDifficultyLevels.map(d => (
                             <button key={d} onClick={() => setDifficulty(d)}
                               className={`flex-1 px-2 py-1 rounded text-[11px] font-medium transition-all ${difficulty === d ? 'bg-orange-500 text-white' : 'bg-slate-800/50 text-slate-400'}`}>
                               {d === 'easy' ? (language === 'vi' ? 'Dễ' : 'Easy') : d === 'intermediate' ? (language === 'vi' ? 'TB' : 'Mid') : (language === 'vi' ? 'Khó' : 'Hard')}
@@ -847,7 +884,7 @@ export default function Battle() {
                    <div>
                      <label className="text-[10px] text-slate-500 mb-1 block">{t('battle.speaker', language)}</label>
                      <div className="flex gap-1">
-                       {(['1st', '2nd'] as const).map(o => (
+                       {battleSpeakerOrders.map(o => (
                          <button key={o} onClick={() => setSpeakerOrder(o)}
                            className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${speakerOrder === o ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
                            {o}
@@ -873,7 +910,7 @@ export default function Battle() {
                <div className="p-3 rounded-xl bg-slate-900/30 border border-white/[0.06]">
                  <label className="text-[10px] text-slate-500 mb-1.5 block">{t('battle.side', language)}</label>
                  <div className="flex gap-1">
-                   {(['for', 'against'] as const).map(s => (
+                   {battleSides.map(s => (
                      <button key={s} onClick={() => setSide(s)}
                        className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${side === s ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
                        {t(`battle.${s}`, language)}

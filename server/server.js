@@ -160,6 +160,7 @@ async function migrateDatabase() {
     `ALTER TABLE topics ADD COLUMN image_id TEXT DEFAULT NULL`,
     `ALTER TABLE bots ADD COLUMN order_num INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE bots ADD COLUMN avatar_url TEXT DEFAULT NULL`,
+    `ALTER TABLE bots ADD COLUMN voice_style TEXT DEFAULT 'default'`,
   ];
   for (const sql of migrations) {
     try {
@@ -197,18 +198,35 @@ async function initializeDatabase() {
     )
   `);
 
-  await dbRun(`
-    CREATE TABLE IF NOT EXISTS lessons (
-      id TEXT PRIMARY KEY,
-      level TEXT NOT NULL,
-      title_en TEXT NOT NULL,
-      title_vi TEXT NOT NULL,
-      content_en TEXT NOT NULL,
-      content_vi TEXT NOT NULL,
-      order_num INTEGER NOT NULL,
-      pinned INTEGER NOT NULL DEFAULT 0
-    )
-  `);
+await dbRun(`
+     CREATE TABLE IF NOT EXISTS lessons (
+       id TEXT PRIMARY KEY,
+       level TEXT NOT NULL,
+       title_en TEXT NOT NULL,
+       title_vi TEXT NOT NULL,
+       content_en TEXT NOT NULL,
+       content_vi TEXT NOT NULL,
+       order_num INTEGER NOT NULL,
+       pinned INTEGER NOT NULL DEFAULT 0,
+       type TEXT NOT NULL DEFAULT 'static',
+       description TEXT,
+       xpReward INTEGER DEFAULT 50,
+       coachId TEXT,
+       coachName TEXT,
+steps TEXT
+      )
+    `);
+
+   await dbRun(`
+     CREATE TABLE IF NOT EXISTS feedback (
+       id TEXT PRIMARY KEY,
+       userId TEXT NOT NULL,
+       lessonId TEXT,
+       content TEXT NOT NULL,
+       status TEXT NOT NULL DEFAULT 'pending',
+       createdAt TEXT NOT NULL
+     )
+   `);
 
   await dbRun(`
     CREATE TABLE IF NOT EXISTS topics (
@@ -221,24 +239,25 @@ async function initializeDatabase() {
     )
   `);
 
-  await dbRun(`
-    CREATE TABLE IF NOT EXISTS bots (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      avatar TEXT NOT NULL,
-      bio_en TEXT NOT NULL,
-      bio_vi TEXT NOT NULL,
-      displayStrength REAL NOT NULL,
-      hiddenPrompt TEXT NOT NULL,
-      knowledge INTEGER NOT NULL,
-      logic INTEGER NOT NULL,
-      rebuttal INTEGER NOT NULL,
-      vocabulary INTEGER NOT NULL,
-      creativity INTEGER NOT NULL,
-      confidence INTEGER NOT NULL,
-      avatar_url TEXT DEFAULT NULL
-    )
-  `);
+await dbRun(`
+     CREATE TABLE IF NOT EXISTS bots (
+       id TEXT PRIMARY KEY,
+       name TEXT NOT NULL,
+       avatar TEXT NOT NULL,
+       bio_en TEXT NOT NULL,
+       bio_vi TEXT NOT NULL,
+       displayStrength REAL NOT NULL,
+       hiddenPrompt TEXT NOT NULL,
+       knowledge INTEGER NOT NULL,
+       logic INTEGER NOT NULL,
+       rebuttal INTEGER NOT NULL,
+       vocabulary INTEGER NOT NULL,
+       creativity INTEGER NOT NULL,
+       confidence INTEGER NOT NULL,
+       avatar_url TEXT DEFAULT NULL,
+       voice_style TEXT DEFAULT 'default'
+     )
+   `);
 
   // NOTE: motions are no longer stored in debatecrab.sqlite. They are read
   // directly from the user-provided server/motions.db file (see
@@ -540,12 +559,13 @@ async function seedDatabase() {
       }
     ];
 
-    for (const b of defaultBots) {
-      await dbRun(`
-        INSERT OR REPLACE INTO bots (id, name, avatar, avatar_url, bio_en, bio_vi, displayStrength, hiddenPrompt, knowledge, logic, rebuttal, vocabulary, creativity, confidence)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [b.id, b.name, b.avatar, b.avatar_url, b.bio_en, b.bio_vi, b.displayStrength, b.hiddenPrompt, b.knowledge, b.logic, b.rebuttal, b.vocabulary, b.creativity, b.confidence]);
-    }
+for (const b of defaultBots) {
+       await dbRun(
+         `INSERT OR REPLACE INTO bots (id, name, avatar, avatar_url, bio_en, bio_vi, displayStrength, hiddenPrompt, knowledge, logic, rebuttal, vocabulary, creativity, confidence, voice_style)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         [b.id, b.name, b.avatar, b.avatar_url, b.bio_en, b.bio_vi, b.displayStrength, b.hiddenPrompt, b.knowledge, b.logic, b.rebuttal, b.vocabulary, b.creativity, b.confidence, b.voice_style || 'default']
+       );
+     }
   }
 
   // Seed AI prompts if empty
@@ -1093,13 +1113,18 @@ app.get('/api/content', async (req, res) => {
     const motions = await getMotionsFromMotionsDb();
     const announcements = await dbAll('SELECT * FROM announcements ORDER BY createdAt DESC');
 
-    res.json({
-      lessons: lessons.map(l => ({ ...l, order: l.order_num, pinned: !!l.pinned })),
-      topics,
-      bots,
-      motions,
-      announcements
-    });
+res.json({
+       lessons: lessons.map(l => ({ 
+         ...l, 
+         order: l.order_num, 
+         pinned: !!l.pinned,
+         steps: l.steps ? JSON.parse(l.steps) : []
+       })),
+       topics,
+       bots,
+       motions,
+       announcements
+     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error fetching content' });
@@ -1108,68 +1133,176 @@ app.get('/api/content', async (req, res) => {
 
 // Admin Content Management - Lessons
 app.post('/api/lessons', async (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
-  const { lesson } = req.body;
-  try {
-    const adminUser = await dbGet('SELECT role FROM users WHERE id = ?', [req.session.userId]);
-    if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'head_admin')) {
-      return res.status(403).json({ error: 'Forbidden' });
+   if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+   const { lesson, script } = req.body;
+   const isInteractive = script !== undefined || lesson?.type === 'interactive';
+   try {
+     const adminUser = await dbGet('SELECT role FROM users WHERE id = ?', [req.session.userId]);
+     if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'head_admin')) {
+       return res.status(403).json({ error: 'Forbidden' });
+     }
+
+     if (isInteractive && script) {
+       const interactiveLesson = {
+         id: script.id || 'script_' + Date.now(),
+         level: script.level ?? 'beginner',
+         title_en: script.title ?? '',
+         title_vi: script.title ?? '',
+         content_en: '',
+         content_vi: '',
+         order_num: lesson?.order ?? (await dbGet('SELECT COUNT(*) as c FROM lessons WHERE level = ?', [script.level ?? 'beginner'])).c + 1,
+         pinned: false,
+         type: 'interactive',
+         description: script.description ?? '',
+         xpReward: script.xpReward ?? 50,
+         coachId: script.coachId ?? 'crab',
+         coachName: script.coachName ?? 'Coach Crab',
+         steps: JSON.stringify(script.steps ?? [])
+       };
+       await dbRun(`
+         INSERT INTO lessons (id, level, title_en, title_vi, content_en, content_vi, order_num, pinned, type, description, xpReward, coachId, coachName, steps)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       `, [interactiveLesson.id, interactiveLesson.level, interactiveLesson.title_en, interactiveLesson.title_vi, interactiveLesson.content_en, interactiveLesson.content_vi, interactiveLesson.order_num, interactiveLesson.pinned, interactiveLesson.type, interactiveLesson.description, interactiveLesson.xpReward, interactiveLesson.coachId, interactiveLesson.coachName, interactiveLesson.steps]);
+     } else {
+      await dbRun(`
+        INSERT INTO lessons (id, level, title_en, title_vi, content_en, content_vi, order_num, pinned, type, description, xpReward, coachId, coachName, steps)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'static', '', 0, '', '', '')
+      `, [lesson.id, lesson.level, lesson.title_en, lesson.title_vi, lesson.content_en, lesson.content_vi, lesson.order, lesson.pinned ? 1 : 0]);
     }
-    await dbRun(`
-      INSERT INTO lessons (id, level, title_en, title_vi, content_en, content_vi, order_num, pinned)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [lesson.id, lesson.level, lesson.title_en, lesson.title_vi, lesson.content_en, lesson.content_vi, lesson.order, lesson.pinned ? 1 : 0]);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+     res.json({ success: true });
+   } catch (err) {
+     console.error(err);
+     res.status(500).json({ error: 'Server error' });
+   }
+ });
 
 app.put('/api/lessons/:id', async (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
-  const { updates } = req.body;
-  const targetId = req.params.id;
-  try {
-    const adminUser = await dbGet('SELECT role FROM users WHERE id = ?', [req.session.userId]);
-    if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'head_admin')) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    const existing = await dbGet('SELECT * FROM lessons WHERE id = ?', [targetId]);
-    if (!existing) return res.status(404).json({ error: 'Not found' });
+   if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+   const { updates, script } = req.body;
+   const targetId = req.params.id;
+   try {
+     const adminUser = await dbGet('SELECT role FROM users WHERE id = ?', [req.session.userId]);
+     if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'head_admin')) {
+       return res.status(403).json({ error: 'Forbidden' });
+     }
+     const existing = await dbGet('SELECT * FROM lessons WHERE id = ?', [targetId]);
+     if (!existing) return res.status(404).json({ error: 'Not found' });
 
-    const level = updates.level !== undefined ? updates.level : existing.level;
-    const title_en = updates.title_en !== undefined ? updates.title_en : existing.title_en;
-    const title_vi = updates.title_vi !== undefined ? updates.title_vi : existing.title_vi;
-    const content_en = updates.content_en !== undefined ? updates.content_en : existing.content_en;
-    const content_vi = updates.content_vi !== undefined ? updates.content_vi : existing.content_vi;
-    const order_num = updates.order !== undefined ? updates.order : existing.order_num;
-    const pinned = updates.pinned !== undefined ? (updates.pinned ? 1 : 0) : existing.pinned;
+     if (script) {
+       const lessonType = script.type || 'interactive';
+       const level = script.level ?? existing.level;
+       const title_en = script.title ?? existing.title_en;
+       const title_vi = script.title ?? existing.title_vi;
+       const order_num = existing.order_num;
+       const description = script.description ?? '';
+       const xpReward = script.xpReward ?? 50;
+       const coachId = script.coachId ?? 'crab';
+       const coachName = script.coachName ?? 'Coach Crab';
+       const steps = JSON.stringify(script.steps ?? []);
 
-    await dbRun(`
-      UPDATE lessons SET
-        level = ?, title_en = ?, title_vi = ?, content_en = ?, content_vi = ?, order_num = ?, pinned = ?
-      WHERE id = ?
-    `, [level, title_en, title_vi, content_en, content_vi, order_num, pinned, targetId]);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+       await dbRun(`
+         UPDATE lessons SET
+           level = ?, title_en = ?, title_vi = ?, order_num = ?, type = ?, description = ?, xpReward = ?, coachId = ?, coachName = ?, steps = ?
+         WHERE id = ?
+       `, [level, title_en, title_vi, order_num, lessonType, description, xpReward, coachId, coachName, steps, targetId]);
+     } else if (updates) {
+       const level = updates.level ?? existing.level;
+       const title_en = updates.title_en ?? existing.title_en;
+       const title_vi = updates.title_vi ?? existing.title_vi;
+       const content_en = updates.content_en ?? existing.content_en;
+       const content_vi = updates.content_vi ?? existing.content_vi;
+       const order_num = updates.order ?? existing.order_num;
+       const pinned = updates.pinned ?? existing.pinned;
+
+       await dbRun(`
+         UPDATE lessons SET
+           level = ?, title_en = ?, title_vi = ?, content_en = ?, content_vi = ?, order_num = ?, pinned = ?
+         WHERE id = ?
+       `, [level, title_en, title_vi, content_en, content_vi, order_num, pinned, targetId]);
+     }
+     res.json({ success: true });
+   } catch (err) {
+     console.error(err);
+     res.status(500).json({ error: 'Server error' });
+   }
+ });
 
 app.delete('/api/lessons/:id', async (req, res) => {
+   if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+   const targetId = req.params.id;
+   try {
+     const adminUser = await dbGet('SELECT role FROM users WHERE id = ?', [req.session.userId]);
+     if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'head_admin')) {
+       return res.status(403).json({ error: 'Forbidden' });
+     }
+     await dbRun('DELETE FROM lessons WHERE id = ?', [targetId]);
+     res.json({ success: true });
+   } catch (err) {
+     res.status(500).json({ error: 'Server error' });
+   }
+ });
+
+// Feedback API
+app.post('/api/feedback', async (req, res) => {
   if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
-  const targetId = req.params.id;
+  const { lessonId, content } = req.body;
+  try {
+    await dbRun(
+      'INSERT INTO feedback (id, userId, lessonId, content, status, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+      ['fb_' + Date.now(), req.session.userId, lessonId || null, content, 'pending', new Date().toISOString()]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+ });
+
+app.get('/api/admin/feedback', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
   try {
     const adminUser = await dbGet('SELECT role FROM users WHERE id = ?', [req.session.userId]);
     if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'head_admin')) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    await dbRun('DELETE FROM lessons WHERE id = ?', [targetId]);
-    res.json({ success: true });
+    const feedback = await dbAll('SELECT f.*, u.username FROM feedback f JOIN users u ON f.userId = u.id ORDER BY createdAt DESC');
+    res.json(feedback);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
-});
+ });
+
+app.put('/api/admin/feedback/:id', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+  const { status } = req.body;
+  try {
+    const adminUser = await dbGet('SELECT role FROM users WHERE id = ?', [req.session.userId]);
+    if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'head_admin')) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    await dbRun('UPDATE feedback SET status = ? WHERE id = ?', [status, req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+ });
+
+app.delete('/api/admin/feedback/:id', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const adminUser = await dbGet('SELECT role FROM users WHERE id = ?', [req.session.userId]);
+    if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'head_admin')) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    await dbRun('DELETE FROM feedback WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+ });
 
 // Admin Content Management - Topics
 app.post('/api/topics', async (req, res) => {
@@ -1275,23 +1408,23 @@ app.delete('/api/topics/:id', async (req, res) => {
 });
 
 // Admin Content Management - Bots
-app.post('/api/bots', async (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
-  const { bot } = req.body;
-  try {
-    const adminUser = await dbGet('SELECT role FROM users WHERE id = ?', [req.session.userId]);
-    if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'head_admin')) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    await dbRun(`
-      INSERT INTO bots (id, name, avatar, avatar_url, bio_en, bio_vi, displayStrength, hiddenPrompt, knowledge, logic, rebuttal, vocabulary, creativity, confidence)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [bot.id, bot.name, bot.avatar, bot.avatar_url || null, bot.bio_en, bot.bio_vi, bot.displayStrength, bot.hiddenPrompt, bot.knowledge, bot.logic, bot.rebuttal, bot.vocabulary, bot.creativity, bot.confidence]);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+ app.post('/api/bots', async (req, res) => {
+   if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+   const { bot } = req.body;
+   try {
+     const adminUser = await dbGet('SELECT role FROM users WHERE id = ?', [req.session.userId]);
+     if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'head_admin')) {
+       return res.status(403).json({ error: 'Forbidden' });
+     }
+     await dbRun(`
+       INSERT INTO bots (id, name, avatar, avatar_url, bio_en, bio_vi, displayStrength, hiddenPrompt, knowledge, logic, rebuttal, vocabulary, creativity, confidence, voice_style)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     `, [bot.id, bot.name, bot.avatar, bot.avatar_url || null, bot.bio_en, bot.bio_vi, bot.displayStrength, bot.hiddenPrompt, bot.knowledge, bot.logic, bot.rebuttal, bot.vocabulary, bot.creativity, bot.confidence, bot.voice_style || 'default']);
+     res.json({ success: true });
+   } catch (err) {
+     res.status(500).json({ error: 'Server error' });
+   }
+ });
 
 app.put('/api/bots/:id', async (req, res) => {
   if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
@@ -1318,13 +1451,14 @@ app.put('/api/bots/:id', async (req, res) => {
     const vocabulary = updates.vocabulary !== undefined ? updates.vocabulary : existing.vocabulary;
     const creativity = updates.creativity !== undefined ? updates.creativity : existing.creativity;
     const confidence = updates.confidence !== undefined ? updates.confidence : existing.confidence;
+    const voice_style = updates.voice_style !== undefined ? updates.voice_style : existing.voice_style;
 
     await dbRun(`
       UPDATE bots SET
         name = ?, avatar = ?, avatar_url = ?, bio_en = ?, bio_vi = ?, displayStrength = ?, hiddenPrompt = ?,
-        knowledge = ?, logic = ?, rebuttal = ?, vocabulary = ?, creativity = ?, confidence = ?
+        knowledge = ?, logic = ?, rebuttal = ?, vocabulary = ?, creativity = ?, confidence = ?, voice_style = ?
       WHERE id = ?
-    `, [name, avatar, avatar_url, bio_en, bio_vi, displayStrength, hiddenPrompt, knowledge, logic, rebuttal, vocabulary, creativity, confidence, targetId]);
+    `, [name, avatar, avatar_url, bio_en, bio_vi, displayStrength, hiddenPrompt, knowledge, logic, rebuttal, vocabulary, creativity, confidence, voice_style, targetId]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });

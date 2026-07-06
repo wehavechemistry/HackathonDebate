@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BookOpen, Users, Bot, FileText, Megaphone, Plus, Trash2, Edit3, Shield, Ban, Pin, Save, X, Key, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, Calendar, Clock, HelpCircle, Award } from 'lucide-react';
+import { BookOpen, Users, Bot, FileText, Megaphone, Plus, Trash2, Edit3, Shield, Ban, Pin, Save, X, Key, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, Calendar, Clock, HelpCircle, Award, MessageCircle } from 'lucide-react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import MarkdownRenderer from '../components/MarkdownRenderer';
@@ -9,6 +9,119 @@ import CoachCrab from '../components/CoachCrab';
 import type { Lesson, Topic, BotPersonality, Announcement, Post, LessonScript, LessonStep } from '../types';
 
 type Tab = 'lessons' | 'users' | 'bots' | 'topics' | 'announcements' | 'announcements_manage' | 'ai_keys' | 'create_admin' | 'community' | 'prompts';
+
+function parseInteractiveScript(script: string): { steps: LessonStep[]; coachId: string; coachName: string } {
+  const steps: LessonStep[] = [];
+  let currentCoachName = 'Coach Crab';
+
+  const lines = script.split('\n');
+  let stepCounter = 0;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const textMatch = trimmed.match(/^\{text,([^}]+)\}\s*(.*)/i);
+    if (textMatch) {
+      const coach = textMatch[1];
+      const text = textMatch[2];
+      if (coach) currentCoachName = coach;
+      if (text) {
+        steps.push({
+          id: 'step_' + Date.now() + '_' + stepCounter++,
+          type: 'text',
+          coachText: text,
+          nextId: null,
+        });
+      }
+      continue;
+    }
+
+    const quizMatch = trimmed.match(/^\{quiz\}\s*(.*)/i);
+    if (quizMatch) {
+      const question = quizMatch[1];
+      steps.push({
+        id: 'step_' + Date.now() + '_' + stepCounter++,
+        type: 'quiz',
+        coachText: question,
+        options: [],
+        correctIndex: 0,
+        explanation: '',
+        nextId: null,
+      });
+      continue;
+    }
+
+    const essayMatch = trimmed.match(/^\{essay\}\s*(.*)/i);
+    if (essayMatch) {
+      const prompt = essayMatch[1];
+      steps.push({
+        id: 'step_' + Date.now() + '_' + stepCounter++,
+        type: 'essay',
+        coachText: prompt,
+        placeholder: '',
+        nextId: null,
+      });
+      continue;
+    }
+
+    const coachMatch = trimmed.match(/^\{coach,([^}]+)\}\s*(.*)/i);
+    if (coachMatch) {
+      currentCoachName = coachMatch[1];
+      const text = coachMatch[2];
+      if (text) {
+        steps.push({
+          id: 'step_' + Date.now() + '_' + stepCounter++,
+          type: 'text',
+          coachText: text,
+          nextId: null,
+        });
+      }
+      continue;
+    }
+
+    const optionMatch = trimmed.match(/^([A-Da-d]\.)\s*(.+)/);
+    if (optionMatch && steps.length > 0) {
+      const lastStep = steps[steps.length - 1];
+      if (lastStep.type === 'quiz') {
+        lastStep.options!.push(optionMatch[2]);
+      }
+      continue;
+    }
+
+    if (trimmed.toLowerCase().startsWith('answer:') || trimmed.toLowerCase().startsWith('correct:')) {
+      const lastStep = steps[steps.length - 1];
+      if (lastStep && lastStep.type === 'quiz') {
+        const letter = trimmed.split(':')[1]?.trim().toUpperCase();
+        const idx = letter ? letter.charCodeAt(0) - 65 : 0;
+        lastStep.correctIndex = isNaN(idx) ? 0 : idx;
+      }
+      continue;
+    }
+
+    if (trimmed.toLowerCase().startsWith('explanation:')) {
+      const lastStep = steps[steps.length - 1];
+      if (lastStep && lastStep.type === 'quiz') {
+        lastStep.explanation = trimmed.substring(12).trim();
+      }
+      continue;
+    }
+
+    if (trimmed.toLowerCase().startsWith('{user}')) {
+      const lastStep = steps[steps.length - 1];
+      if (lastStep && lastStep.type === 'essay') {
+        lastStep.placeholder = trimmed.substring(6).trim();
+      }
+      continue;
+    }
+  }
+
+  for (let i = 0; i < steps.length - 1; i++) {
+    steps[i].nextId = steps[i + 1].id;
+  }
+
+  return { steps, coachId: 'crab', coachName: currentCoachName };
+}
 
 export default function Admin() {
   const store = useStore();
@@ -30,6 +143,7 @@ export default function Admin() {
     { key: 'community', label: t('admin.community', language), icon: FileText },
     { key: 'prompts', label: 'AI Prompts', icon: MessageSquare },
     { key: 'ai_keys', label: t('admin.ai_keys', language), icon: Key },
+    { key: 'feedback', label: 'Feedback', icon: MessageCircle },
     { key: 'create_admin', label: t('admin.create_admin', language), icon: Shield, headOnly: true },
   ];
 
@@ -66,6 +180,7 @@ export default function Admin() {
         {tab === 'community' && <CommunityManager />}
         {tab === 'prompts' && <PromptsManager />}
         {tab === 'ai_keys' && <AiKeysManager />}
+        {tab === 'feedback' && <FeedbackManager />}
         {tab === 'create_admin' && isHeadAdmin && <CreateAdmin />}
       </motion.div>
     </div>
@@ -76,7 +191,7 @@ function LessonsManager() {
   const { lessons, language, addLesson, updateLesson, deleteLesson, reorderLessons, addInteractiveLesson, updateInteractiveLesson, deleteInteractiveLesson } = useStore();
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<Partial<Lesson & LessonScript & { type: 'static' | 'interactive' }>>({ steps: [], type: 'static' });
+  const [form, setForm] = useState<Partial<Lesson & LessonScript & { type: 'static' | 'interactive'; scriptText?: string }>>({ steps: [], type: 'static' });
   const [currentStep, setCurrentStep] = useState<Partial<LessonStep> & { optionsText?: string }>({});
 
   const moveLesson = async (id: string, direction: 'up' | 'down') => {
@@ -242,7 +357,32 @@ function LessonsManager() {
               </div>
 
               <div className="border-t border-slate-700 pt-4">
-                <h3 className="text-sm font-semibold text-white mb-2">Steps Builder ({form.steps?.length || 0} steps)</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-white">Script Editor (Quick Entry)</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const script = (form as any).scriptText || '';
+                      const { steps, coachName } = parseInteractiveScript(script);
+                      setForm({ ...form, steps, coachName });
+                    }}
+                    className="px-2 py-1 bg-sky-500 hover:bg-sky-600 text-white text-xs rounded"
+                  >
+                    Parse Script
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500 mb-2">
+                  Format: {"{text,Name}"} Hello! | {"{quiz}"} Question | A. Option1 | answer: A | explanation: ...
+                </p>
+                <textarea
+                  value={(form as any).scriptText || ''}
+                  onChange={e => setForm({ ...form, scriptText: e.target.value })}
+                  placeholder="{text,Coach Crab} Hello! This is the intro...&#10;{quiz} What is debate?&#10;A. Argument&#10;B. Fighting&#10;C. Discussion&#10;answer: C&#10;explanation: Great job!"
+                  className="w-full px-2 py-1 bg-slate-800/50 border border-slate-600 rounded text-white text-xs font-mono resize-none"
+                  rows={6}
+                />
+
+                <h3 className="text-sm font-semibold text-white mt-4 mb-2">Steps Builder ({form.steps?.length || 0} steps)</h3>
                 {(form.steps || []).map((step, i) => (
                   <div key={step.id} className="p-2 mb-2 bg-slate-900/30 rounded-lg text-xs text-slate-300">
                     <span className="font-semibold">{i + 1}. {step.type}</span>: {step.coachText?.slice(0, 50)}...

@@ -6,8 +6,7 @@ import { t } from '../i18n';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import CoachCrab from '../components/CoachCrab';
 import type { Post, Reply } from '../types';
-
-const categories = ['general', 'education', 'technology', 'environment', 'economics', 'politics', 'society', 'media', 'culture', 'misc'] as const;
+import { communityPostCategories } from '../data/content';
 
 export default function Community() {
   const { currentUser, language, posts, fetchPosts, createPost, deletePost, updatePost, fetchReplies, createReply, votePost, voteReply, replies } = useStore();
@@ -17,7 +16,7 @@ export default function Community() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ title: '', content: '', category: 'general' as typeof categories[number] });
+  const [form, setForm] = useState({ title: '', content: '', category: 'general' as (typeof communityPostCategories)[number] });
   const [replyContent, setReplyContent] = useState('');
   const [replying, setReplying] = useState(false);
 
@@ -272,10 +271,10 @@ export default function Community() {
           >
             <select
               value={form.category}
-              onChange={e => setForm({ ...form, category: e.target.value as typeof categories[number] })}
+              onChange={e => setForm({ ...form, category: e.target.value as (typeof communityPostCategories)[number] })}
               className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
-              {categories.map(c => (
+              {communityPostCategories.map(c => (
                 <option key={c} value={c} className="capitalize">{c}</option>
               ))}
             </select>
