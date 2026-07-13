@@ -52,7 +52,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
 });
 
 // Separate connection to the user-provided motions database (motions.db)
-// This file has its own schema: motions (id INTEGER PK, motion TEXT, category TEXT)
+// This file has its own schema: motions (id INTEGER PK, motion TEXT, category TEXT, difficulty TEXT)
 const motionsDbPath = path.resolve(__dirname, 'motions.db');
 const motionsDb = new sqlite3.Database(motionsDbPath, sqlite3.OPEN_READONLY, (err) => {
   if (err) {
@@ -72,11 +72,11 @@ const motionsDbAll = (sql, params = []) => {
   });
 };
 
-// Difficulty tiers used to spread motions.db rows across easy/intermediate/hard
-// so the frontend's difficulty filter (Battle.tsx) has motions in every bucket.
-const DIFFICULTY_TIERS = ['easy', 'intermediate', 'hard'];
-function deriveDifficulty(id) {
-  return DIFFICULTY_TIERS[id % DIFFICULTY_TIERS.length];
+// Normalize difficulty from DB (e.g. "Beginner" -> "easy", "Advanced" -> "hard")
+function normalizeDifficulty(d) {
+  if (!d) return 'intermediate';
+  const map = { 'beginner': 'easy', 'intermediate': 'intermediate', 'advanced': 'hard' };
+  return map[d.toString().toLowerCase().trim()] || 'intermediate';
 }
 
 // Normalize free-form categories from motions.db (e.g. "Artificial Intelligence",
@@ -97,12 +97,12 @@ function normalizeCategory(category) {
 // motions.db has no Vietnamese translation column, so motion_vi falls back to
 // the same English text rather than being left blank.
 async function getMotionsFromMotionsDb() {
-  const rows = await motionsDbAll('SELECT id, motion, category FROM motions ORDER BY id ASC');
+  const rows = await motionsDbAll('SELECT id, motion, category, difficulty FROM motions ORDER BY id ASC');
   return rows.map(row => ({
     id: String(row.id),
     motion_en: row.motion,
     motion_vi: row.motion,
-    difficulty: deriveDifficulty(row.id),
+    difficulty: normalizeDifficulty(row.difficulty),
     category: normalizeCategory(row.category),
   }));
 }
