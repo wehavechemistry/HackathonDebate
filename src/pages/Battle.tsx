@@ -645,6 +645,7 @@ export default function Battle() {
 
   const endDebate = async () => {
     if (!motion_) return;
+    if (!endlessMode && !(userSpeeches >= rounds && aiSpeeches >= rounds)) return;
     setPhase('judging');
     setIsLoading(true);
     setTimerRunning(false);
@@ -1097,7 +1098,7 @@ export default function Battle() {
               <textarea
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                className="flex-1 bg-transparent text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 resize-none focus:outline-none scrollbar-thin"
+                className="flex-1 bg-transparent text-sm text-slate-800 dark:text-slate-200 placeholder-slate-500 resize-none focus:outline-none scrollbar-thin"
                 placeholder={language === 'vi' ? 'Ghi chú luận điểm tranh biện của bạn tại đây...' : 'Jot down your debate points or arguments here...'}
               />
             )}
@@ -1161,10 +1162,10 @@ export default function Battle() {
               <>
                 {messages.length === 0 && !isLoading && (
                   <div className="flex flex-col items-center justify-center h-full text-slate-500 dark:text-slate-400 space-y-3">
-                    <div className="p-4 bg-orange-500/10 rounded-2xl">
+                    <div className="p-5 bg-gradient-to-br from-orange-500/20 via-orange-500/10 to-transparent rounded-full border border-orange-500/20 shadow-lg shadow-orange-500/10">
                       <CoachCrab size={54} animate={false} />
                     </div>
-                    <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-300">
                       {language === 'vi' ? 'Trận đấu bắt đầu! Hãy trình bày bài phát biểu của bạn.' : 'Debate started! Present your opening speech.'}
                     </p>
                   </div>
@@ -1267,7 +1268,7 @@ export default function Battle() {
                       ? (language === 'vi' ? 'Nhập phát biểu của bạn tại đây...' : 'Type your speech here...')
                       : (language === 'vi' ? 'Đang chờ bài nói của đối thủ AI...' : 'Waiting for AI opponent to speak...')}
                     disabled={currentTurn !== 'user' || isLoading || (!endlessMode && userSpeeches >= rounds && aiSpeeches >= rounds)}
-                    className="flex-1 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-white text-sm placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50 resize-none disabled:opacity-50"
+                    className="flex-1 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-white text-sm placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 resize-none disabled:opacity-50"
                     rows={3}
                     onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) submitSpeech(); }}
                   />
@@ -1275,7 +1276,7 @@ export default function Battle() {
                     <button
                       onClick={() => submitSpeech()}
                       disabled={!inputText.trim() || currentTurn !== 'user' || isLoading || (!endlessMode && userSpeeches >= rounds && aiSpeeches >= rounds)}
-                      className="flex-1 px-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-all disabled:opacity-50 shadow-sm hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1.5 text-sm font-medium"
+                      className="flex-1 px-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-orange-500/10 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1.5 text-sm font-medium"
                     >
                       <Send size={16} />
                       {t('battle.submit', language)}
@@ -1286,7 +1287,7 @@ export default function Battle() {
                       className={`flex-1 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 text-sm font-medium ${
                         isListening
                           ? 'bg-red-500 hover:bg-red-600 text-white border border-red-500 animate-pulse'
-                          : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
+                          : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
                       }`}
                     >
                       {isListening ? <MicOff size={16} /> : <Mic size={16} />}
@@ -1336,7 +1337,8 @@ export default function Battle() {
                     </button>
                     <button
                       onClick={endDebate}
-                      className="px-4 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-650 dark:text-red-400 text-xs font-semibold rounded-lg border border-red-500/20 transition-all"
+                      disabled={!endlessMode && !(userSpeeches >= rounds && aiSpeeches >= rounds)}
+                      className="px-4 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-650 dark:text-red-400 text-xs font-semibold rounded-lg border border-red-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {t('battle.end_debate', language)}
                     </button>
